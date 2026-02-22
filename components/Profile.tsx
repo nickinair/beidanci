@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { UserProfile } from '../types';
-import { ChevronLeft, Trophy, Coins, History, ArrowUpRight, LogOut, Edit2, MapPin, School, GraduationCap, ChevronRight, BookX, Gift } from 'lucide-react';
+import { UserProfile, PointRecord } from '../types';
+import { ChevronLeft, Trophy, Coins, History, ArrowUpRight, LogOut, Edit2, MapPin, School, GraduationCap, ChevronRight, ChevronDown, BookX, Gift } from 'lucide-react';
 import ProfileSetup from './ProfileSetup';
 import { REGIONS } from '../data/regions';
 
@@ -14,7 +14,71 @@ interface ProfileProps {
   onViewRewards?: () => void;
 }
 
+// Collapsible point records section
+const HistorySection: React.FC<{ records: PointRecord[] }> = ({ records }) => {
+  const [expanded, setExpanded] = React.useState(false);
+  const sorted = [...records].reverse();
+  const visible = expanded ? sorted : sorted.slice(0, 3);
+
+  return (
+    <section>
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center justify-between mb-3 group"
+      >
+        <h4 className="text-sm font-bold text-white/60 flex items-center gap-2">
+          <History size={14} className="text-blue-400" /> 历史战绩
+          {records.length > 0 && (
+            <span className="text-[10px] bg-white/8 px-1.5 py-0.5 rounded-full text-white/30">{records.length}</span>
+          )}
+        </h4>
+        {records.length > 3 && (
+          <div className="flex items-center gap-1 text-[10px] text-white/25 group-hover:text-white/40 transition-colors">
+            {expanded ? '收起' : '查看全部'}
+            <ChevronDown size={12} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+          </div>
+        )}
+      </button>
+      <div className="space-y-2">
+        {records.length === 0 ? (
+          <div className="text-center py-8 text-white/15 glass rounded-xl border border-dashed border-white/10">
+            <p className="font-medium text-sm">还没有积分记录</p>
+          </div>
+        ) : (
+          <>
+            {visible.map((record, idx) => (
+              <div key={idx} className="glass p-3 rounded-xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${record.amount < 0 ? 'bg-red-500/10' : 'bg-amber-500/10'}`}>
+                    <ArrowUpRight className={`w-4 h-4 ${record.amount < 0 ? 'text-red-400 rotate-180' : 'text-amber-400'}`} />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white/80 text-sm">{record.reason}</p>
+                    <p className="text-[10px] text-white/20">{new Date(record.timestamp).toLocaleString()}</p>
+                  </div>
+                </div>
+                <div className={`text-lg font-bold ${record.amount < 0 ? 'text-red-400' : 'text-amber-400'}`}>
+                  {record.amount > 0 ? '+' : ''}{record.amount}
+                </div>
+              </div>
+            ))}
+            {!expanded && records.length > 3 && (
+              <button
+                onClick={() => setExpanded(true)}
+                className="w-full py-2 text-[11px] text-white/25 hover:text-white/40 transition-colors"
+              >
+                还有 {records.length - 3} 条记录 · 点击展开
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </section>
+  );
+};
+
 const Profile: React.FC<ProfileProps> = ({ user, onLogout, onUpdate, onViewHistory, onViewErrorBook, onViewRewards }) => {
+
   const [isEditing, setIsEditing] = React.useState(false);
   const [key, setKey] = React.useState(0);
 
@@ -100,34 +164,8 @@ const Profile: React.FC<ProfileProps> = ({ user, onLogout, onUpdate, onViewHisto
             </div>
           </div>
 
-          {/* Point Records */}
-          <section>
-            <h4 className="text-sm font-bold text-white/60 flex items-center gap-2 mb-3">
-              <History size={14} className="text-blue-400" /> 历史战绩
-            </h4>
-            <div className="space-y-2">
-              {user.pointRecords.length === 0 ? (
-                <div className="text-center py-8 text-white/15 glass rounded-xl border border-dashed border-white/10">
-                  <p className="font-medium text-sm">还没有积分记录</p>
-                </div>
-              ) : (
-                user.pointRecords.slice().reverse().map((record, idx) => (
-                  <div key={idx} className="glass p-3 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-amber-500/10 p-2 rounded-lg">
-                        <ArrowUpRight className="text-amber-400 w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-white/80 text-sm">{record.reason}</p>
-                        <p className="text-[10px] text-white/20">{new Date(record.timestamp).toLocaleString()}</p>
-                      </div>
-                    </div>
-                    <div className="text-lg font-bold text-amber-400">+{record.amount}</div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
+          {/* Point Records - Collapsible */}
+          <HistorySection records={user.pointRecords} />
 
           {/* Quick Actions */}
           <div className="space-y-2">

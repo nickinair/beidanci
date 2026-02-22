@@ -464,7 +464,7 @@ export const dbService = {
     },
 
     /**
-     * Fetch total points from leaderboard for a user
+     * Fetch total points - checks leaderboard first, then profiles table
      */
     async fetchUserTotalPoints(userId: string) {
         if (!supabase) {
@@ -474,14 +474,17 @@ export const dbService = {
             return { total_points: total };
         }
 
-        const { data, error } = await supabase
-            .from('leaderboard')
-            .select('total_points')
-            .eq('user_id', userId)
-            .maybeSingle();
+        // Fetch from both leaderboard and profiles in parallel
+        const [leaderboardRes, profileRes] = await Promise.all([
+            supabase.from('leaderboard').select('total_points').eq('user_id', userId).maybeSingle(),
+            supabase.from('profiles').select('total_points').eq('id', userId).maybeSingle(),
+        ]);
 
-        if (error) throw error;
-        return data; // Returns null if no leaderboard entry exists
+        const leaderboardPts = leaderboardRes.data?.total_points || 0;
+        const profilePts = profileRes.data?.total_points || 0;
+
+        // Use whichever is greater — handles both trigger-updated leaderboard and manual profile edits
+        return { total_points: Math.max(leaderboardPts, profilePts) };
     },
 
     /**
