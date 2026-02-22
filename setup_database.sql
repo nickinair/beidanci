@@ -93,3 +93,9 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS grade INTEGER;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS total_points INTEGER DEFAULT 0;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_check_in TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS check_in_streak INTEGER DEFAULT 0;
+
+-- Disable RLS or add permissive policies (required for anon key access)
+ALTER TABLE public.profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.test_history DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_points DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.leaderboard DISABLE ROW LEVEL SECURITY;

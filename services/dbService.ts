@@ -67,6 +67,7 @@ export const dbService = {
         }
 
         // 1. Check if user exists by username (mapped to 'name' column)
+        console.log('[DB] loginOrRegister: checking for user', username);
         let { data: profile, error } = await supabase
             .from('profiles')
             .select('*')
@@ -74,19 +75,27 @@ export const dbService = {
             .maybeSingle();
 
         if (error) {
+            console.error('[DB] Error checking user:', error);
             throw error;
         }
 
         if (!profile) {
             // 2. Create new profile if not found
+            console.log('[DB] User not found, creating new profile...');
             const { data: newProfile, error: createError } = await supabase
                 .from('profiles')
                 .insert([{ name: username, avatar }])
                 .select()
                 .single();
 
-            if (createError) throw createError;
+            if (createError) {
+                console.error('[DB] Error creating profile:', createError);
+                throw createError;
+            }
+            console.log('[DB] Profile created successfully:', newProfile?.id);
             profile = newProfile;
+        } else {
+            console.log('[DB] Found existing profile:', profile.id);
         }
 
         // 4. Fetch history and points
@@ -95,6 +104,9 @@ export const dbService = {
             this.fetchPointRecords(profile.id),
             this.fetchUserTotalPoints(profile.id)
         ]);
+
+        // Use total_points from profile table as fallback
+        const totalPoints = leaderboardEntry?.total_points || profile.total_points || 0;
 
         return {
             id: profile.id,
@@ -107,8 +119,10 @@ export const dbService = {
             schoolId: profile.school_id,
             schoolName: profile.school_name,
             grade: profile.grade,
+            lastCheckIn: profile.last_check_in,
+            checkInStreak: profile.check_in_streak || 0,
 
-            totalPoints: leaderboardEntry?.total_points || 0,
+            totalPoints,
             highScore: profile.high_score || 0,
             history: history,
             pointRecords: pointRecords
