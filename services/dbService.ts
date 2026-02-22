@@ -119,6 +119,11 @@ export const dbService = {
      * Update User Profile (Location, School, etc)
      */
     async updateProfile(userId: string, updates: Partial<UserProfile>): Promise<void> {
+        // Also save to local storage for extended profile persistence
+        const extendedKey = `ext_profile_${userId}`;
+        const existing = JSON.parse(localStorage.getItem(extendedKey) || '{}');
+        localStorage.setItem(extendedKey, JSON.stringify({ ...existing, ...updates }));
+
         if (!supabase) {
             const profiles = this._getLocalData(LS_KEYS.PROFILES);
             const index = profiles.findIndex((p: any) => p.id === userId);
@@ -129,27 +134,34 @@ export const dbService = {
             return;
         }
 
-        // For Supabase, we would need to add these columns to the table first.
-        // Since we can't easily run migrations here, we might fail if columns don't exist.
-        // BUT, for this demo, we can just return success and update local state in App.tsx
-        // OR try to update and ignore specific errors.
-        // Let's assume we proceed with local-only persistence for these extra fields if DB fails?
-        // Actually, let's try to update. worst case it errors out.
-        // To be safe and compliant with the "solve bugs" request, let's NOT crash.
+        // Map UserProfile fields to DB column names
+        const dbUpdates: Record<string, any> = {};
+        if (updates.province !== undefined) dbUpdates.province = updates.province;
+        if (updates.city !== undefined) dbUpdates.city = updates.city;
+        if (updates.district !== undefined) dbUpdates.district = updates.district;
+        if (updates.schoolId !== undefined) dbUpdates.school_id = updates.schoolId;
+        if (updates.schoolName !== undefined) dbUpdates.school_name = updates.schoolName;
+        if (updates.grade !== undefined) dbUpdates.grade = updates.grade;
+        if (updates.totalPoints !== undefined) dbUpdates.total_points = updates.totalPoints;
+        if (updates.highScore !== undefined) dbUpdates.high_score = updates.highScore;
+        if (updates.lastCheckIn !== undefined) dbUpdates.last_check_in = updates.lastCheckIn;
+        if (updates.checkInStreak !== undefined) dbUpdates.check_in_streak = updates.checkInStreak;
+        if (updates.avatar !== undefined) dbUpdates.avatar = updates.avatar;
 
-        /* 
-           NOTE: The database schema in setup_database.sql was NOT updated with new columns.
-           So `supabase.update` will fail for 'province', 'school_id' etc.
-           
-           PLAN: We will rely on the `UserProfile` object in `App.tsx` state for the session,
-           and maybe store this extra info in `localStorage` mapping userId -> extraData 
-           even when using Supabase, to avoid schema migration blockers.
-        */
+        if (Object.keys(dbUpdates).length === 0) return;
 
-        // Save to local storage for "Extended Profile" persistence regardless of backend
-        const extendedKey = `ext_profile_${userId}`;
-        const existing = JSON.parse(localStorage.getItem(extendedKey) || '{}');
-        localStorage.setItem(extendedKey, JSON.stringify({ ...existing, ...updates }));
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update(dbUpdates)
+                .eq('id', userId);
+
+            if (error) {
+                console.error('Failed to update profile in Supabase:', error);
+            }
+        } catch (err) {
+            console.error('Supabase updateProfile error:', err);
+        }
     },
 
     // Helper to merge extended profile

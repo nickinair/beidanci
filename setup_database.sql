@@ -4,6 +4,15 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     name TEXT UNIQUE NOT NULL,
     avatar TEXT,
     high_score INTEGER DEFAULT 0,
+    province TEXT,
+    city TEXT,
+    district TEXT,
+    school_id TEXT,
+    school_name TEXT,
+    grade INTEGER,
+    total_points INTEGER DEFAULT 0,
+    last_check_in TEXT,
+    check_in_streak INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -52,6 +61,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_leaderboard ON public.user_points;
 CREATE TRIGGER trigger_update_leaderboard
 AFTER INSERT ON public.user_points
 FOR EACH ROW EXECUTE FUNCTION update_leaderboard_on_points();
@@ -67,13 +77,19 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_high_score ON public.test_history;
 CREATE TRIGGER trigger_update_high_score
 AFTER INSERT ON public.test_history
 FOR EACH ROW EXECUTE FUNCTION update_high_score();
 
--- Enable RLS (Row Level Security) - Optional but recommended for production
--- For now, we will assume the user handles security or uses service role for simplicity in this demo.
--- ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE public.test_history ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE public.user_points ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE public.leaderboard ENABLE ROW LEVEL SECURITY;
+-- Migration helper: Add missing columns if table already exists
+-- Run these if you already have data and don't want to drop/recreate
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS province TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS city TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS district TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS school_id TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS school_name TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS grade INTEGER;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS total_points INTEGER DEFAULT 0;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_check_in TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS check_in_streak INTEGER DEFAULT 0;

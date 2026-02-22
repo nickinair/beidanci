@@ -82,7 +82,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users: initialUsers, currentU
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto space-y-2 pb-28 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto space-y-2 pb-40 scrollbar-hide">
         {loading ? (
           <div className="text-center py-10 text-white/20 font-medium">加载中...</div>
         ) : displayUsers.length === 0 ? (
@@ -114,7 +114,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users: initialUsers, currentU
 
       {/* My Rank Footer */}
       {currentUser && (
-        <div className="fixed bottom-20 left-0 right-0 z-40">
+        <div className="fixed left-0 right-0 z-40" style={{ bottom: 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 75px)' }}>
           <div className="max-w-md mx-auto px-5">
             <div className="glass rounded-xl p-3 border border-white/10 shadow-lg shadow-black/20">
               <div className="flex items-center gap-3">

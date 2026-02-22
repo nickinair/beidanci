@@ -14,9 +14,9 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onTabChange }) => {
     ];
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 z-50">
-            <div className="max-w-md mx-auto px-4 pb-safe">
-                <div className="glass rounded-2xl mb-2 px-2 py-1 flex justify-between items-center border border-white/10 shadow-lg shadow-black/20">
+        <div className="fixed bottom-0 left-0 right-0 z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+            <div className="max-w-md mx-auto px-4 pb-1">
+                <div className="glass rounded-2xl px-2 py-1 flex justify-between items-center border border-white/10 shadow-lg shadow-black/20">
                     {tabs.map(tab => {
                         const Icon = tab.icon;
                         const isActive = currentTab === tab.id;
@@ -25,8 +25,8 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onTabChange }) => {
                                 key={tab.id}
                                 onClick={() => onTabChange(tab.id)}
                                 className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 rounded-xl transition-all duration-300 ${isActive
-                                        ? 'bg-white/10 text-white'
-                                        : 'text-white/40 hover:text-white/60'
+                                    ? 'bg-white/10 text-white'
+                                    : 'text-white/40 hover:text-white/60'
                                     }`}
                             >
                                 <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} />

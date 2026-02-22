@@ -191,7 +191,11 @@ const App: React.FC = () => {
     };
     setCurrentUser(updated);
     if (currentUser.id) {
-      dbService.updateProfile(currentUser.id, { totalPoints: updated.totalPoints }).catch(console.error);
+      dbService.updateProfile(currentUser.id, {
+        totalPoints: updated.totalPoints,
+        lastCheckIn: updated.lastCheckIn,
+        checkInStreak: updated.checkInStreak,
+      }).catch(console.error);
     }
     alert(newStreak === 7 ? `🎉 签到成功！连续7天奖励，共获得 ${pts} 积分！` : `✅ 签到成功！+${pts} 积分`);
   };
