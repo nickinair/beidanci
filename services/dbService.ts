@@ -202,7 +202,10 @@ export const dbService = {
         if (updates.schoolId !== undefined) dbUpdates.school_id = updates.schoolId;
         if (updates.schoolName !== undefined) dbUpdates.school_name = updates.schoolName;
         if (updates.grade !== undefined) dbUpdates.grade = updates.grade;
-        if (updates.totalPoints !== undefined) dbUpdates.total_points = updates.totalPoints;
+        // NOTE: Do NOT write total_points to profiles — the leaderboard table
+        // (managed by a DB trigger aggregating user_points) is the single source
+        // of truth for points. Writing total_points here would inflate the profile
+        // value and cause a mismatch with the leaderboard.
         if (updates.highScore !== undefined) dbUpdates.high_score = updates.highScore;
         if (updates.lastCheckIn !== undefined) dbUpdates.last_check_in = updates.lastCheckIn;
         if (updates.checkInStreak !== undefined) dbUpdates.check_in_streak = updates.checkInStreak;
@@ -518,7 +521,10 @@ export const dbService = {
     },
 
     /**
-     * Fetch total points - checks leaderboard first, then profiles table
+     * Fetch total points - uses leaderboard table as single source of truth.
+     * The leaderboard table is maintained by a DB trigger that sums all user_points
+     * rows, including negative redemption deductions. Do NOT use Math.max with
+     * profiles.total_points as that field can be stale / inflated by direct writes.
      */
     async fetchUserTotalPoints(userId: string) {
         if (!supabase) {
@@ -528,17 +534,29 @@ export const dbService = {
             return { total_points: total };
         }
 
-        // Fetch from both leaderboard and profiles in parallel
-        const [leaderboardRes, profileRes] = await Promise.all([
-            supabase.from('leaderboard').select('total_points').eq('user_id', userId).maybeSingle(),
-            supabase.from('profiles').select('total_points').eq('id', userId).maybeSingle(),
-        ]);
+        // Primary source: leaderboard table (trigger-computed sum of all user_points)
+        const leaderboardRes = await supabase
+            .from('leaderboard')
+            .select('total_points')
+            .eq('user_id', userId)
+            .maybeSingle();
 
-        const leaderboardPts = leaderboardRes.data?.total_points || 0;
-        const profilePts = profileRes.data?.total_points || 0;
+        if (leaderboardRes.data != null) {
+            return { total_points: leaderboardRes.data.total_points || 0 };
+        }
 
-        // Use whichever is greater — handles both trigger-updated leaderboard and manual profile edits
-        return { total_points: Math.max(leaderboardPts, profilePts) };
+        // Fallback: if no leaderboard entry exists yet, compute from user_points directly
+        const pointsRes = await supabase
+            .from('user_points')
+            .select('amount')
+            .eq('user_id', userId);
+
+        if (!pointsRes.error && pointsRes.data) {
+            const total = pointsRes.data.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+            return { total_points: total };
+        }
+
+        return { total_points: 0 };
     },
 
     /**
