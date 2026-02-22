@@ -200,6 +200,9 @@ const App: React.FC = () => {
         lastCheckIn: updated.lastCheckIn,
         checkInStreak: updated.checkInStreak,
       }).catch(console.error);
+
+      // Persist the point record
+      dbService.savePointRecord(currentUser.id, pts, reason).catch(console.error);
     }
     alert(newStreak === 7 ? `🎉 签到成功！连续7天奖励，共获得 ${pts} 积分！` : `✅ 签到成功！+${pts} 积分`);
   };

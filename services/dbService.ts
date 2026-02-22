@@ -111,8 +111,8 @@ export const dbService = {
                     console.log('[DB] Existing profile found:', profile.id);
                 }
 
-                // Sync any pending data from offline sessions
-                this._syncPendingData(profile.id, username).catch(() => { });
+                // Sync any pending data from offline sessions - wait for it to finish
+                await this._syncPendingData(profile.id, username).catch(() => { });
 
                 const [history, pointRecords, leaderboardEntry] = await Promise.all([
                     this.fetchUserHistory(profile.id),
@@ -333,7 +333,11 @@ export const dbService = {
             timestamp: new Date().toISOString(),
         };
 
-        // Always persist locally first
+        // Always persist locally first (both in history and in sync queue)
+        const localPoints = this._getLocalData(LS_KEYS.POINTS);
+        localPoints.push(record);
+        this._setLocalData(LS_KEYS.POINTS, localPoints);
+
         const pending = this._getLocalData(LS_KEYS.PENDING_POINTS);
         pending.push(record);
         this._setLocalData(LS_KEYS.PENDING_POINTS, pending);
@@ -498,7 +502,15 @@ export const dbService = {
 
         if (error) throw error;
 
-        return data.map(item => ({
+        // Also merge local pending points that haven't been synced yet for UI consistency
+        const pending = this._getLocalData(LS_KEYS.PENDING_POINTS)
+            .filter((p: any) => p.user_id === userId);
+
+        const combined = [...data, ...pending].sort((a: any, b: any) =>
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+
+        return combined.map(item => ({
             amount: item.amount,
             reason: item.reason,
             timestamp: new Date(item.timestamp).getTime()
