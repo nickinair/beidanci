@@ -14,8 +14,8 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onTabChange }) => {
     ];
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-            <div className="max-w-md mx-auto px-4 pb-1">
+        <div className="w-full" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+            <div className="px-4 pb-1">
                 <div className="glass rounded-2xl px-2 py-1 flex justify-between items-center border border-white/10 shadow-lg shadow-black/20">
                     {tabs.map(tab => {
                         const Icon = tab.icon;

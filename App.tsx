@@ -220,7 +220,25 @@ const App: React.FC = () => {
   };
 
   return (
-    <Layout>
+    <Layout
+      footer={showBottomNav ? (
+        <BottomNav
+          currentTab={appState as any}
+          onTabChange={(tab) => {
+            if (tab === 'leaderboard') {
+              // Pre-fetch if needed
+              setIsLoading(true);
+              dbService.fetchLeaderboard().then(rankings => {
+                setLeaderboardUsers(rankings as any);
+                setAppState(tab);
+              }).catch(err => console.error(err)).finally(() => setIsLoading(false));
+            } else {
+              setAppState(tab);
+            }
+          }}
+        />
+      ) : null}
+    >
       {appState === 'login' && (
         <Login onLogin={handleLogin} />
       )}
@@ -233,7 +251,7 @@ const App: React.FC = () => {
       )}
 
       {/* All Views */}
-      <div className={`flex-1 flex flex-col ${showBottomNav ? 'pb-[70px]' : ''}`}>
+      <div className="flex-1 flex flex-col min-h-0">
         {appState === 'home' && currentUser && (
           <Home
             user={currentUser}
@@ -317,25 +335,6 @@ const App: React.FC = () => {
           />
         )}
       </div>
-
-      {/* Bottom Navigation */}
-      {showBottomNav && (
-        <BottomNav
-          currentTab={appState as any}
-          onTabChange={(tab) => {
-            if (tab === 'leaderboard') {
-              // Pre-fetch if needed
-              setIsLoading(true);
-              dbService.fetchLeaderboard().then(rankings => {
-                setLeaderboardUsers(rankings as any);
-                setAppState(tab);
-              }).catch(err => console.error(err)).finally(() => setIsLoading(false));
-            } else {
-              setAppState(tab);
-            }
-          }}
-        />
-      )}
 
       {isLoading && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50">
