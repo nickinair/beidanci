@@ -322,6 +322,48 @@ export const dbService = {
     },
 
     /**
+     * Save a single point record (e.g. redemption deduction, check-in bonus)
+     * to the user_points table. Local-first with async Supabase sync.
+     */
+    async savePointRecord(userId: string, amount: number, reason: string): Promise<void> {
+        const record = {
+            user_id: userId,
+            amount,
+            reason,
+            timestamp: new Date().toISOString(),
+        };
+
+        // Always persist locally first
+        const pending = this._getLocalData(LS_KEYS.PENDING_POINTS);
+        pending.push(record);
+        this._setLocalData(LS_KEYS.PENDING_POINTS, pending);
+
+        if (!supabase) return;
+
+        // Async push to Supabase
+        (async () => {
+            try {
+                const result = await withTimeout(
+                    Promise.resolve(supabase!.from('user_points').insert([record])),
+                    8000
+                );
+                const error = (result as any).error;
+                if (!error) {
+                    // Remove from pending queue on success
+                    const updated = this._getLocalData(LS_KEYS.PENDING_POINTS)
+                        .filter((r: any) => !(r.user_id === userId && r.reason === reason && r.timestamp === record.timestamp));
+                    this._setLocalData(LS_KEYS.PENDING_POINTS, updated);
+                    console.log('[DB] Point record saved to Supabase ✓', reason);
+                } else {
+                    console.error('[DB] Failed to save point record:', error);
+                }
+            } catch (err) {
+                console.warn('[DB] savePointRecord timed out, queued for sync:', err);
+            }
+        })();
+    },
+
+    /**
      * Sync any locally-queued data to Supabase (called after successful login)
      */
     async _syncPendingData(supabaseUserId: string, username: string): Promise<void> {

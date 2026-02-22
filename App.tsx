@@ -210,7 +210,9 @@ const App: React.FC = () => {
     const record: PointRecord = { amount: -amount, reason, timestamp: Date.now() };
     setCurrentUser({ ...currentUser, totalPoints: newPoints, pointRecords: [...currentUser.pointRecords, record] });
     if (currentUser.id) {
+      // Save updated total AND the point record (negative) to Supabase
       dbService.updateProfile(currentUser.id, { totalPoints: newPoints }).catch(console.error);
+      dbService.savePointRecord(currentUser.id, -amount, reason).catch(console.error);
     }
   };
 
