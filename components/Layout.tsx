@@ -16,8 +16,8 @@ const Layout: React.FC<LayoutProps> = ({ children, footer }) => {
         <div className="absolute -bottom-32 left-1/3 w-72 h-72 bg-indigo-600/10 rounded-full blur-3xl" />
       </div>
 
-      <div className="max-w-md w-full h-full md:h-auto md:min-h-0 md:max-h-[calc(100vh-3rem)] md:rounded-3xl md:my-4 glass md:border md:border-white/10 flex flex-col relative md:shadow-2xl overflow-hidden">
-        <main className="flex-1 overflow-y-auto px-4 py-5 md:px-6 scrollbar-hide relative">
+      <div className="max-w-md w-full h-full md:h-auto md:min-h-0 md:max-h-[calc(100dvh-3rem)] md:rounded-3xl md:my-4 glass md:border md:border-white/10 flex flex-col relative md:shadow-2xl overflow-hidden">
+        <main className="flex-1 overflow-y-auto px-4 py-5 md:px-6 scrollbar-hide relative min-h-0">
           {children}
         </main>
         {footer && (

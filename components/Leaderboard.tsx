@@ -114,7 +114,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users: initialUsers, currentU
 
       {/* My Rank Sticky Footer */}
       {currentUser && (
-        <div className="sticky bottom-0 z-40 -mx-4 px-4 py-2 bg-gradient-to-t from-[#0f172a] via-[#0f172a]/90 to-transparent">
+        <div className="sticky bottom-[-1px] z-40 -mx-4 px-4 py-3 bg-gradient-to-t from-[#0f172a] via-[#0f172a] to-transparent backdrop-blur-sm">
           <div className="glass rounded-xl p-3 border border-white/10 shadow-lg shadow-black/20">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold ${myRank > 0 ? 'bg-blue-500/20 text-blue-400' : 'bg-white/5 text-white/20'}`}>
