@@ -7,8 +7,19 @@ import { SCHOOLS } from '../data/schools';
 const LS_KEYS = {
     PROFILES: 'wordChallenge_profiles',
     HISTORY: 'wordChallenge_history',
-    POINTS: 'wordChallenge_points'
+    POINTS: 'wordChallenge_points',
+    PENDING_HISTORY: 'wordChallenge_pending_history',
+    PENDING_POINTS: 'wordChallenge_pending_points',
+    PENDING_PROFILES: 'wordChallenge_pending_profiles',
 };
+
+// Helper: race a promise against a timeout
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+    ]);
+}
 
 export const dbService = {
     /**
@@ -66,67 +77,102 @@ export const dbService = {
             } as any;
         }
 
-        // 1. Check if user exists by username (mapped to 'name' column)
-        console.log('[DB] loginOrRegister: checking for user', username);
-        let { data: profile, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('name', username)
-            .maybeSingle();
+        try {
+            // Wrap entire Supabase flow in a 6s timeout
+            return await withTimeout((async () => {
+                console.log('[DB] loginOrRegister (Supabase): checking for user', username);
 
-        if (error) {
-            console.error('[DB] Error checking user:', error);
-            throw error;
-        }
+                let { data: profile, error } = await supabase!
+                    .from('profiles')
+                    .select('*')
+                    .eq('name', username)
+                    .maybeSingle();
 
-        if (!profile) {
-            // 2. Create new profile if not found
-            console.log('[DB] User not found, creating new profile...');
-            const { data: newProfile, error: createError } = await supabase
-                .from('profiles')
-                .insert([{ name: username, avatar }])
-                .select()
-                .single();
+                if (error) {
+                    console.error('[DB] Error checking user:', error);
+                    throw error;
+                }
 
-            if (createError) {
-                console.error('[DB] Error creating profile:', createError);
-                throw createError;
+                if (!profile) {
+                    console.log('[DB] Creating new Supabase profile...');
+                    const { data: newProfile, error: createError } = await supabase!
+                        .from('profiles')
+                        .insert([{ name: username, avatar }])
+                        .select()
+                        .single();
+
+                    if (createError) {
+                        console.error('[DB] Error creating profile:', createError);
+                        throw createError;
+                    }
+                    console.log('[DB] Profile created:', newProfile?.id);
+                    profile = newProfile;
+                } else {
+                    console.log('[DB] Existing profile found:', profile.id);
+                }
+
+                // Sync any pending data from offline sessions
+                this._syncPendingData(profile.id, username).catch(() => { });
+
+                const [history, pointRecords, leaderboardEntry] = await Promise.all([
+                    this.fetchUserHistory(profile.id),
+                    this.fetchPointRecords(profile.id),
+                    this.fetchUserTotalPoints(profile.id)
+                ]);
+
+                const totalPoints = leaderboardEntry?.total_points || profile.total_points || 0;
+
+                return {
+                    id: profile.id,
+                    name: profile.name,
+                    username: profile.name,
+                    avatar: profile.avatar,
+                    province: profile.province,
+                    city: profile.city,
+                    district: profile.district,
+                    schoolId: profile.school_id,
+                    schoolName: profile.school_name,
+                    grade: profile.grade,
+                    lastCheckIn: profile.last_check_in,
+                    checkInStreak: profile.check_in_streak || 0,
+                    totalPoints,
+                    highScore: profile.high_score || 0,
+                    history,
+                    pointRecords
+                } as any;
+            })(), 6000);
+        } catch (err: any) {
+            console.warn('[DB] Supabase loginOrRegister failed/timed out, using offline profile:', err.message);
+            // Fall back: create/load local profile, mark for later sync
+            const profiles = this._getLocalData(LS_KEYS.PROFILES);
+            let profile = profiles.find((p: any) => p.name === username || p.username === username);
+            if (!profile) {
+                profile = {
+                    id: 'local_' + Date.now(),
+                    name: username,
+                    username,
+                    avatar,
+                    created_at: new Date().toISOString(),
+                    _pendingSupabaseCreate: true,
+                };
+                profiles.push(profile);
+                this._setLocalData(LS_KEYS.PROFILES, profiles);
+                // Queue for later Supabase sync
+                const pending = this._getLocalData(LS_KEYS.PENDING_PROFILES);
+                pending.push({ name: username, avatar });
+                this._setLocalData(LS_KEYS.PENDING_PROFILES, pending);
             }
-            console.log('[DB] Profile created successfully:', newProfile?.id);
-            profile = newProfile;
-        } else {
-            console.log('[DB] Found existing profile:', profile.id);
+            const history = await this.fetchUserHistory(profile.id);
+            const pointRecords = await this.fetchPointRecords(profile.id);
+            const totalPointsObj = await this.fetchUserTotalPoints(profile.id);
+            return {
+                ...profile,
+                totalPoints: totalPointsObj?.total_points || 0,
+                highScore: 0,
+                history,
+                pointRecords
+            } as any;
         }
-
-        // 4. Fetch history and points
-        const [history, pointRecords, leaderboardEntry] = await Promise.all([
-            this.fetchUserHistory(profile.id),
-            this.fetchPointRecords(profile.id),
-            this.fetchUserTotalPoints(profile.id)
-        ]);
-
-        // Use total_points from profile table as fallback
-        const totalPoints = leaderboardEntry?.total_points || profile.total_points || 0;
-
-        return {
-            id: profile.id,
-            name: profile.name,
-            username: profile.name,
-            avatar: profile.avatar,
-            province: profile.province,
-            city: profile.city,
-            district: profile.district,
-            schoolId: profile.school_id,
-            schoolName: profile.school_name,
-            grade: profile.grade,
-            lastCheckIn: profile.last_check_in,
-            checkInStreak: profile.check_in_streak || 0,
-
-            totalPoints,
-            highScore: profile.high_score || 0,
-            history: history,
-            pointRecords: pointRecords
-        } as any;
     },
 
     /**
@@ -185,64 +231,167 @@ export const dbService = {
 
     /**
      * Save a quiz result and update points
+     * Strategy: always save locally first, then try Supabase in background
      */
     async saveQuizResult(userId: string, result: QuizResult): Promise<void> {
-        if (!supabase) {
-            console.log('Offline Mode: saveQuizResult');
-            const history = this._getLocalData(LS_KEYS.HISTORY);
-            history.push({
-                user_id: userId,
-                score: result.score,
-                total_questions: result.totalQuestions,
-                correct_count: result.correctCount,
-                time_spent: result.timeSpent,
-                points_earned: result.pointsEarned,
-                attempts: result.attempts,
-                timestamp: new Date(result.timestamp).toISOString()
-            });
-            this._setLocalData(LS_KEYS.HISTORY, history);
+        const historyRecord = {
+            user_id: userId,
+            score: result.score,
+            total_questions: result.totalQuestions,
+            correct_count: result.correctCount,
+            time_spent: result.timeSpent,
+            points_earned: result.pointsEarned,
+            attempts: result.attempts,
+            timestamp: new Date(result.timestamp).toISOString()
+        };
+        const pointRecord = result.pointsEarned > 0 ? {
+            user_id: userId,
+            amount: result.pointsEarned,
+            reason: `挑战成绩: ${result.score}分`,
+            timestamp: new Date(result.timestamp).toISOString()
+        } : null;
 
-            if (result.pointsEarned > 0) {
-                const points = this._getLocalData(LS_KEYS.POINTS);
-                points.push({
-                    user_id: userId,
-                    amount: result.pointsEarned,
-                    reason: `挑战成绩: ${result.score}分`,
-                    timestamp: new Date(result.timestamp).toISOString()
-                });
-                this._setLocalData(LS_KEYS.POINTS, points);
+        // 1. Always save locally first (guaranteed, instant)
+        const localHistory = this._getLocalData(LS_KEYS.HISTORY);
+        localHistory.push(historyRecord);
+        this._setLocalData(LS_KEYS.HISTORY, localHistory);
+        if (pointRecord) {
+            const localPoints = this._getLocalData(LS_KEYS.POINTS);
+            localPoints.push(pointRecord);
+            this._setLocalData(LS_KEYS.POINTS, localPoints);
+        }
+
+        if (!supabase || userId.startsWith('local_')) {
+            // Queue for later sync when online
+            const pending = this._getLocalData(LS_KEYS.PENDING_HISTORY);
+            pending.push(historyRecord);
+            this._setLocalData(LS_KEYS.PENDING_HISTORY, pending);
+            if (pointRecord) {
+                const pendingPts = this._getLocalData(LS_KEYS.PENDING_POINTS);
+                pendingPts.push(pointRecord);
+                this._setLocalData(LS_KEYS.PENDING_POINTS, pendingPts);
             }
             return;
         }
 
-        // 1. Save to test_history
-        const { error: historyError } = await supabase
-            .from('test_history')
-            .insert([{
-                user_id: userId,
-                score: result.score,
-                total_questions: result.totalQuestions,
-                correct_count: result.correctCount,
-                time_spent: result.timeSpent,
-                points_earned: result.pointsEarned,
-                attempts: result.attempts,
-                timestamp: new Date(result.timestamp).toISOString()
-            }]);
+        // 2. Try Supabase in background (non-blocking, fire-and-forget)
+        (async () => {
+            try {
+                const result1 = await withTimeout(
+                    Promise.resolve(supabase!.from('test_history').insert([historyRecord])),
+                    8000
+                );
+                const historyError = (result1 as any).error;
+                if (historyError) {
+                    console.error('[DB] Failed to save history to Supabase:', historyError);
+                    // Queue for retry
+                    const pending = this._getLocalData(LS_KEYS.PENDING_HISTORY);
+                    pending.push(historyRecord);
+                    this._setLocalData(LS_KEYS.PENDING_HISTORY, pending);
+                } else {
+                    console.log('[DB] Quiz history saved to Supabase ✓');
+                }
 
-        if (historyError) throw historyError;
+                if (pointRecord) {
+                    const result2 = await withTimeout(
+                        Promise.resolve(supabase!.from('user_points').insert([pointRecord])),
+                        8000
+                    );
+                    const pointsError = (result2 as any).error;
+                    if (pointsError) {
+                        console.error('[DB] Failed to save points to Supabase:', pointsError);
+                        const pendingPts = this._getLocalData(LS_KEYS.PENDING_POINTS);
+                        pendingPts.push(pointRecord);
+                        this._setLocalData(LS_KEYS.PENDING_POINTS, pendingPts);
+                    } else {
+                        console.log('[DB] Points saved to Supabase ✓');
+                    }
+                }
+            } catch (err) {
+                console.warn('[DB] Supabase saveQuizResult timed out, queued for sync:', err);
+                const pending = this._getLocalData(LS_KEYS.PENDING_HISTORY);
+                pending.push(historyRecord);
+                this._setLocalData(LS_KEYS.PENDING_HISTORY, pending);
+                if (pointRecord) {
+                    const pendingPts = this._getLocalData(LS_KEYS.PENDING_POINTS);
+                    pendingPts.push(pointRecord);
+                    this._setLocalData(LS_KEYS.PENDING_POINTS, pendingPts);
+                }
+            }
+        })();
+    },
 
-        // 2. Save to user_points if points were earned
-        if (result.pointsEarned > 0) {
-            const { error: pointsError } = await supabase
-                .from('user_points')
-                .insert([{
-                    user_id: userId,
-                    amount: result.pointsEarned,
-                    reason: `挑战成绩: ${result.score}分`,
-                    timestamp: new Date(result.timestamp).toISOString()
-                }]);
+    /**
+     * Sync any locally-queued data to Supabase (called after successful login)
+     */
+    async _syncPendingData(supabaseUserId: string, username: string): Promise<void> {
+        if (!supabase) return;
 
-            if (pointsError) throw pointsError;
+        // Sync pending profiles (offline registrations)
+        const pendingProfiles = this._getLocalData(LS_KEYS.PENDING_PROFILES);
+        const myPending = pendingProfiles.filter((p: any) => p.name === username);
+        if (myPending.length > 0) {
+            console.log('[DB] No need to sync profile - already created in Supabase');
+            // Clear pending profiles for this user
+            const remaining = pendingProfiles.filter((p: any) => p.name !== username);
+            this._setLocalData(LS_KEYS.PENDING_PROFILES, remaining);
+
+            // Update local profile id to match Supabase
+            const profiles = this._getLocalData(LS_KEYS.PROFILES);
+            const idx = profiles.findIndex((p: any) => p.name === username);
+            if (idx !== -1 && profiles[idx].id?.startsWith('local_')) {
+                const oldId = profiles[idx].id;
+                profiles[idx].id = supabaseUserId;
+                this._setLocalData(LS_KEYS.PROFILES, profiles);
+
+                // Fix user_id in pending history/points
+                const ph = this._getLocalData(LS_KEYS.PENDING_HISTORY)
+                    .map((r: any) => r.user_id === oldId ? { ...r, user_id: supabaseUserId } : r);
+                this._setLocalData(LS_KEYS.PENDING_HISTORY, ph);
+                const pp = this._getLocalData(LS_KEYS.PENDING_POINTS)
+                    .map((r: any) => r.user_id === oldId ? { ...r, user_id: supabaseUserId } : r);
+                this._setLocalData(LS_KEYS.PENDING_POINTS, pp);
+            }
+        }
+
+        // Sync pending history
+        const pendingHistory = this._getLocalData(LS_KEYS.PENDING_HISTORY)
+            .filter((r: any) => r.user_id === supabaseUserId);
+        if (pendingHistory.length > 0) {
+            console.log(`[DB] Syncing ${pendingHistory.length} pending history records...`);
+            try {
+                const r1 = await withTimeout(
+                    Promise.resolve(supabase!.from('test_history').insert(pendingHistory)),
+                    10000
+                );
+                const error = (r1 as any).error;
+                if (!error) {
+                    const remaining = this._getLocalData(LS_KEYS.PENDING_HISTORY)
+                        .filter((r: any) => r.user_id !== supabaseUserId);
+                    this._setLocalData(LS_KEYS.PENDING_HISTORY, remaining);
+                    console.log('[DB] Pending history synced ✓');
+                }
+            } catch (e) { console.warn('[DB] History sync failed:', e); }
+        }
+
+        // Sync pending points
+        const pendingPoints = this._getLocalData(LS_KEYS.PENDING_POINTS)
+            .filter((r: any) => r.user_id === supabaseUserId);
+        if (pendingPoints.length > 0) {
+            console.log(`[DB] Syncing ${pendingPoints.length} pending point records...`);
+            try {
+                const r2 = await withTimeout(
+                    Promise.resolve(supabase!.from('user_points').insert(pendingPoints)),
+                    10000
+                );
+                const error = (r2 as any).error;
+                if (!error) {
+                    const remaining = this._getLocalData(LS_KEYS.PENDING_POINTS)
+                        .filter((r: any) => r.user_id !== supabaseUserId);
+                    this._setLocalData(LS_KEYS.PENDING_POINTS, remaining);
+                    console.log('[DB] Pending points synced ✓');
+                }
+            } catch (e) { console.warn('[DB] Points sync failed:', e); }
         }
     },
 
