@@ -14,6 +14,7 @@ export const SCHOOLS: School[] = [
     { id: 's_bj_hd_8', name: '一零一中学', type: 'junior', province: 'bj', city: 'bj_bj', district: 'bj_hd' },
     { id: 's_bj_hd_9', name: '海淀区教师进修学校附属实验学校', type: 'junior', province: 'bj', city: 'bj_bj', district: 'bj_hd' },
     { id: 's_bj_hd_10', name: '十一学校', type: 'junior', province: 'bj', city: 'bj_bj', district: 'bj_hd' },
+    { id: 's_bj_hd_11', name: '北外附校', type: 'junior', province: 'bj', city: 'bj_bj', district: 'bj_hd' },
 
     // 东城区 (bj_dc)
     { id: 's_bj_dc_1', name: '北京市府学胡同小学', type: 'primary', province: 'bj', city: 'bj_bj', district: 'bj_dc' },
