@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT UNIQUE NOT NULL,
     avatar TEXT,
+    password_hash TEXT,
     high_score INTEGER DEFAULT 0,
     province TEXT,
     city TEXT,
@@ -93,6 +94,7 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS grade INTEGER;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS total_points INTEGER DEFAULT 0;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_check_in TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS check_in_streak INTEGER DEFAULT 0;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS password_hash TEXT;
 
 -- Disable RLS or add permissive policies (required for anon key access)
 ALTER TABLE public.profiles DISABLE ROW LEVEL SECURITY;
