@@ -39,9 +39,10 @@ const App: React.FC = () => {
           // If we have a saved user, try to log them in automatically
           const user = await dbService.loginOrRegister(savedUsername);
 
-          // Check if profile is complete
+          // Merge localStorage extras but NEVER let them overwrite Supabase-owned fields
           const extended = dbService.getExtendedProfile(user.id || '');
-          const fullUser = { ...user, ...extended };
+          const { totalPoints, highScore, history, pointRecords, ...safeExtended } = extended as any;
+          const fullUser = { ...user, ...safeExtended };
           setCurrentUser(fullUser);
 
           if (!fullUser.schoolId) {
@@ -67,9 +68,10 @@ const App: React.FC = () => {
     try {
       const user = await dbService.loginOrRegister(username);
 
-      // Load extended profile (local storage for now)
+      // Merge localStorage extras but NEVER let them overwrite Supabase-owned fields
       const extended = dbService.getExtendedProfile(user.id || '');
-      const fullUser = { ...user, ...extended };
+      const { totalPoints, highScore, history, pointRecords, ...safeExtended } = extended as any;
+      const fullUser = { ...user, ...safeExtended };
 
       setCurrentUser(fullUser);
       localStorage.setItem('wordChallenge_currentUser', username);
@@ -97,7 +99,8 @@ const App: React.FC = () => {
       // Re-fetch to get updated data
       const user = await dbService.loginOrRegister(currentUser.name);
       const extended = dbService.getExtendedProfile(user.id || '');
-      const fullUser = { ...user, ...extended };
+      const { totalPoints, highScore, history, pointRecords, ...safeExtended } = extended as any;
+      const fullUser = { ...user, ...safeExtended };
       setCurrentUser(fullUser);
       // Also update logic for leaderboard
       setAllUsers(prev => prev.map(u => u.id === fullUser.id ? fullUser : u));
