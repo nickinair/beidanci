@@ -59,7 +59,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users: initialUsers, currentU
   ];
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* Header */}
       <div className="mb-4">
         <h2 className="text-xl font-bold text-white mb-3">排行榜</h2>
@@ -82,7 +82,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users: initialUsers, currentU
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto space-y-2 pb-40 scrollbar-hide">
+      <div className="space-y-2 pb-6">
         {loading ? (
           <div className="text-center py-10 text-white/20 font-medium">加载中...</div>
         ) : displayUsers.length === 0 ? (
@@ -112,26 +112,24 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users: initialUsers, currentU
         )}
       </div>
 
-      {/* My Rank Footer */}
+      {/* My Rank Sticky Footer */}
       {currentUser && (
-        <div className="fixed left-0 right-0 z-40" style={{ bottom: 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 75px)' }}>
-          <div className="max-w-md mx-auto px-5">
-            <div className="glass rounded-xl p-3 border border-white/10 shadow-lg shadow-black/20">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold ${myRank > 0 ? 'bg-blue-500/20 text-blue-400' : 'bg-white/5 text-white/20'}`}>
-                  {myRank > 0 ? myRank : '-'}
+        <div className="sticky bottom-0 z-40 -mx-4 px-4 py-2 bg-gradient-to-t from-[#0f172a] via-[#0f172a]/90 to-transparent">
+          <div className="glass rounded-xl p-3 border border-white/10 shadow-lg shadow-black/20">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold ${myRank > 0 ? 'bg-blue-500/20 text-blue-400' : 'bg-white/5 text-white/20'}`}>
+                {myRank > 0 ? myRank : '-'}
+              </div>
+              <div className="flex-1">
+                <div className="flex justify-between items-center mb-0.5">
+                  <span className="text-sm font-semibold text-white/70">我的排名</span>
+                  <span className="text-sm font-bold text-amber-400">{myScore} 分</span>
                 </div>
-                <div className="flex-1">
-                  <div className="flex justify-between items-center mb-0.5">
-                    <span className="text-sm font-semibold text-white/70">我的排名</span>
-                    <span className="text-sm font-bold text-amber-400">{myScore} 分</span>
-                  </div>
-                  {myRank > 1 && (
-                    <div className="text-[10px] text-blue-400/70">距上一名差 {displayUsers[myRank - 2].totalPoints - myScore} 分</div>
-                  )}
-                  {myRank === 1 && <div className="text-[10px] text-amber-400/70">👑 当前榜首！</div>}
-                  {myRank === 0 && <div className="text-[10px] text-white/20">暂未上榜</div>}
-                </div>
+                {myRank > 1 && (
+                  <div className="text-[10px] text-blue-400/70">距上一名差 {displayUsers[myRank - 2].totalPoints - myScore} 分</div>
+                )}
+                {myRank === 1 && <div className="text-[10px] text-amber-400/70">👑 当前榜首！</div>}
+                {myRank === 0 && <div className="text-[10px] text-white/20">暂未上榜</div>}
               </div>
             </div>
           </div>
