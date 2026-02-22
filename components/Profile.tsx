@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { UserProfile, PointRecord } from '../types';
-import { ChevronLeft, Trophy, Coins, History, ArrowUpRight, LogOut, Edit2, MapPin, School, GraduationCap, ChevronRight, ChevronDown, BookX, Gift } from 'lucide-react';
+import { ChevronLeft, Trophy, Coins, History, ArrowUpRight, LogOut, Edit2, MapPin, School, GraduationCap, ChevronRight, ChevronDown, BookX, Gift, Receipt } from 'lucide-react';
 import ProfileSetup from './ProfileSetup';
 import { REGIONS } from '../data/regions';
 
@@ -14,11 +14,51 @@ interface ProfileProps {
   onViewRewards?: () => void;
 }
 
-// Collapsible point records section
+// Inline collapsible redemption history (兑换记录), sits below 福利社 button
+const RedemptionSection: React.FC<{ records: PointRecord[] }> = ({ records }) => {
+  const [open, setOpen] = React.useState(false);
+  const redemptions = [...records].filter(r => String(r.reason).startsWith('兑换商品')).reverse();
+
+  return (
+    <div className="glass rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between p-3 hover:bg-white/8 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="bg-purple-500/10 p-2 rounded-lg"><Receipt size={16} className="text-purple-400" /></div>
+          <span className="font-semibold text-white/70 text-sm">兑换记录</span>
+          {redemptions.length > 0 && (
+            <span className="text-[10px] bg-white/8 px-1.5 py-0.5 rounded-full text-white/30">{redemptions.length}</span>
+          )}
+        </div>
+        <ChevronDown size={16} className={`text-white/20 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-2 border-t border-white/5 pt-2">
+          {redemptions.length === 0 ? (
+            <p className="text-center text-white/20 text-xs py-3">暂无兑换记录</p>
+          ) : redemptions.map((r, i) => (
+            <div key={i} className="flex items-center justify-between py-1.5">
+              <div>
+                <p className="text-white/70 text-sm font-medium">{r.reason.replace('兑换商品: ', '')}</p>
+                <p className="text-[10px] text-white/20">{new Date(r.timestamp).toLocaleString()}</p>
+              </div>
+              <span className="text-red-400 font-bold text-sm">{r.amount}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Collapsible point records section (earned points only, excludes redemptions)
 const HistorySection: React.FC<{ records: PointRecord[] }> = ({ records }) => {
   const [expanded, setExpanded] = React.useState(false);
-  const sorted = [...records].reverse();
-  const visible = expanded ? sorted : sorted.slice(0, 3);
+  // Only show earned/positive records here; redemptions go to RedemptionSection
+  const earned = [...records].filter(r => !String(r.reason).startsWith('兑换商品')).reverse();
+  const visible = expanded ? earned : earned.slice(0, 3);
 
   return (
     <section>
@@ -28,11 +68,11 @@ const HistorySection: React.FC<{ records: PointRecord[] }> = ({ records }) => {
       >
         <h4 className="text-sm font-bold text-white/60 flex items-center gap-2">
           <History size={14} className="text-blue-400" /> 历史战绩
-          {records.length > 0 && (
-            <span className="text-[10px] bg-white/8 px-1.5 py-0.5 rounded-full text-white/30">{records.length}</span>
+          {earned.length > 0 && (
+            <span className="text-[10px] bg-white/8 px-1.5 py-0.5 rounded-full text-white/30">{earned.length}</span>
           )}
         </h4>
-        {records.length > 3 && (
+        {earned.length > 3 && (
           <div className="flex items-center gap-1 text-[10px] text-white/25 group-hover:text-white/40 transition-colors">
             {expanded ? '收起' : '查看全部'}
             <ChevronDown size={12} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
@@ -40,7 +80,7 @@ const HistorySection: React.FC<{ records: PointRecord[] }> = ({ records }) => {
         )}
       </button>
       <div className="space-y-2">
-        {records.length === 0 ? (
+        {earned.length === 0 ? (
           <div className="text-center py-8 text-white/15 glass rounded-xl border border-dashed border-white/10">
             <p className="font-medium text-sm">还没有积分记录</p>
           </div>
@@ -62,12 +102,12 @@ const HistorySection: React.FC<{ records: PointRecord[] }> = ({ records }) => {
                 </div>
               </div>
             ))}
-            {!expanded && records.length > 3 && (
+            {!expanded && earned.length > 3 && (
               <button
                 onClick={() => setExpanded(true)}
                 className="w-full py-2 text-[11px] text-white/25 hover:text-white/40 transition-colors"
               >
-                还有 {records.length - 3} 条记录 · 点击展开
+                还有 {earned.length - 3} 条记录 · 点击展开
               </button>
             )}
           </>
@@ -178,6 +218,8 @@ const Profile: React.FC<ProfileProps> = ({ user, onLogout, onUpdate, onViewHisto
                 <ChevronRight size={16} className="text-white/20" />
               </button>
             )}
+            {/* 兑换记录 - inline collapsible, right below 福利社 */}
+            <RedemptionSection records={user.pointRecords} />
             {onViewHistory && (
               <button onClick={onViewHistory} className="w-full flex items-center justify-between glass p-3 rounded-xl hover:bg-white/8 transition-colors">
                 <div className="flex items-center gap-3">
