@@ -15,6 +15,7 @@ import Leaderboard from './components/Leaderboard';
 import Rules from './components/Rules';
 import ErrorBook from './components/ErrorBook';
 import RewardsStore from './components/RewardsStore';
+import RedemptionHistory from './components/RedemptionHistory';
 import BottomNav from './components/BottomNav';
 
 import { dbService } from './services/dbService';
@@ -254,6 +255,7 @@ const App: React.FC = () => {
             onViewHistory={() => setAppState('history')}
             onViewErrorBook={() => setAppState('error-book')}
             onViewRewards={() => setAppState('rewards')}
+            onViewRedemptionHistory={() => setAppState('redemption-history')}
           />
         )}
 
@@ -298,6 +300,14 @@ const App: React.FC = () => {
             user={currentUser}
             onBack={() => setAppState('profile')}
             onDeductPoints={handleDeductPoints}
+          />
+        )}
+
+        {appState === 'redemption-history' && currentUser && (
+          <RedemptionHistory
+            pointRecords={currentUser.pointRecords}
+            currentPoints={currentUser.totalPoints}
+            onBack={() => setAppState('profile')}
           />
         )}
       </div>

@@ -77,4 +77,4 @@ export interface UserProfile {
   wrongQuestions: WrongQuestion[];
 }
 
-export type AppState = 'login' | 'home' | 'quiz' | 'result' | 'history' | 'profile' | 'leaderboard' | 'rules' | 'profile-setup' | 'error-book' | 'rewards';
+export type AppState = 'login' | 'home' | 'quiz' | 'result' | 'history' | 'profile' | 'leaderboard' | 'rules' | 'profile-setup' | 'error-book' | 'rewards' | 'redemption-history';
