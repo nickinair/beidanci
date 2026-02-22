@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
 import { REWARD_PRODUCTS, RewardProduct, CartItem } from '../data/rewardsData';
-import { ChevronLeft, ShoppingCart, Plus, Minus, Trash2, CheckCircle, Gift, Package, Sparkles, ChevronRight, Coins } from 'lucide-react';
+import { ChevronLeft, ShoppingCart, Plus, Minus, Trash2, CheckCircle, Gift, Package, Sparkles, ChevronRight, Coins, History } from 'lucide-react';
 
 interface RewardsStoreProps {
     user: UserProfile;
     onBack: () => void;
     onDeductPoints: (amount: number, reason: string) => void;
+    onViewRedemptionHistory?: () => void;
 }
 
 type StoreView = 'catalog' | 'detail' | 'cart' | 'complete';
@@ -21,7 +22,7 @@ const CATEGORY_LABELS: Record<Category, string> = {
     gift_card: '京东卡',
 };
 
-const RewardsStore: React.FC<RewardsStoreProps> = ({ user, onBack, onDeductPoints }) => {
+const RewardsStore: React.FC<RewardsStoreProps> = ({ user, onBack, onDeductPoints, onViewRedemptionHistory }) => {
     const [view, setView] = useState<StoreView>('catalog');
     const [selectedProduct, setSelectedProduct] = useState<RewardProduct | null>(null);
     const [cart, setCart] = useState<CartItem[]>([]);
@@ -87,12 +88,23 @@ const RewardsStore: React.FC<RewardsStoreProps> = ({ user, onBack, onDeductPoint
                             <p className="text-[10px] text-white/25">用积分兑换心仪好物</p>
                         </div>
                     </div>
-                    <button onClick={() => setView('cart')} className="relative p-2.5 glass-light rounded-xl hover:bg-white/10 transition-colors">
-                        <ShoppingCart size={18} className="text-white/60" />
-                        {cartCount > 0 && (
-                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{cartCount}</span>
+                    <div className="flex items-center gap-2">
+                        {onViewRedemptionHistory && (
+                            <button
+                                onClick={onViewRedemptionHistory}
+                                title="兑换记录"
+                                className="p-2.5 glass-light rounded-xl hover:bg-white/10 transition-colors relative"
+                            >
+                                <History size={18} className="text-white/60" />
+                            </button>
                         )}
-                    </button>
+                        <button onClick={() => setView('cart')} className="relative p-2.5 glass-light rounded-xl hover:bg-white/10 transition-colors">
+                            <ShoppingCart size={18} className="text-white/60" />
+                            {cartCount > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{cartCount}</span>
+                            )}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Points Bar */}
@@ -141,7 +153,6 @@ const RewardsStore: React.FC<RewardsStoreProps> = ({ user, onBack, onDeductPoint
         );
     }
 
-    // ==================== DETAIL VIEW ====================
     if (view === 'detail' && selectedProduct) {
         const inCart = cart.find(c => c.product.id === selectedProduct.id);
         const canAfford = user.totalPoints >= selectedProduct.pointsCost;

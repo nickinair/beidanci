@@ -300,6 +300,7 @@ const App: React.FC = () => {
             user={currentUser}
             onBack={() => setAppState('profile')}
             onDeductPoints={handleDeductPoints}
+            onViewRedemptionHistory={() => setAppState('redemption-history')}
           />
         )}
 
