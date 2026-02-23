@@ -112,7 +112,16 @@ export const dbService = {
                 }
 
                 // Sync any pending data from offline sessions - wait for it to finish
-                await this._syncPendingData(profile.id, username).catch(() => { });
+                await this._syncPendingData(profile.id, username, profile.total_points).catch(() => { });
+
+                // RE-FETCH profile after sync to get the absolute latest authoritative balance
+                const { data: latestProfile } = await supabase!
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', profile.id)
+                    .maybeSingle();
+
+                if (latestProfile) profile = latestProfile;
 
                 const [history, pointRecords, leaderboardEntry] = await Promise.all([
                     this.fetchUserHistory(profile.id),
@@ -371,8 +380,9 @@ export const dbService = {
 
     /**
      * Sync any locally-queued data to Supabase (called after successful login)
+     * Now also updates the authoritative profiles.total_points balance.
      */
-    async _syncPendingData(supabaseUserId: string, username: string): Promise<void> {
+    async _syncPendingData(supabaseUserId: string, username: string, currentBalance: number = 0): Promise<void> {
         if (!supabase) return;
 
         // Sync pending profiles (offline registrations)
@@ -425,8 +435,12 @@ export const dbService = {
         // Sync pending points
         const pendingPoints = this._getLocalData(LS_KEYS.PENDING_POINTS)
             .filter((r: any) => r.user_id === supabaseUserId);
+
+        let totalPointsSynced = 0;
+
         if (pendingPoints.length > 0) {
             console.log(`[DB] Syncing ${pendingPoints.length} pending point records...`);
+            totalPointsSynced = pendingPoints.reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
             try {
                 const r2 = await withTimeout(
                     Promise.resolve(supabase!.from('user_points').insert(pendingPoints)),
@@ -440,6 +454,36 @@ export const dbService = {
                     console.log('[DB] Pending points synced ✓');
                 }
             } catch (e) { console.warn('[DB] Points sync failed:', e); }
+        }
+
+        // Sync extra profile fields (school, grade, etc) from local storage
+        const localExt = this.getExtendedProfile(supabaseUserId);
+        const profiles = this._getLocalData(LS_KEYS.PROFILES);
+        const myLocalProfile = profiles.find((p: any) => p.name === username) || {};
+
+        // Prepare updates for the authoritative profiles table
+        const profileUpdates: any = {};
+        if (totalPointsSynced !== 0) {
+            profileUpdates.total_points = currentBalance + totalPointsSynced;
+        }
+
+        // Sync fields from local profile (if set offline)
+        const fieldsToSync = ['province', 'city', 'district', 'schoolId', 'schoolName', 'grade', 'phone', 'lastCheckIn', 'checkInStreak'];
+        fieldsToSync.forEach(field => {
+            const val = myLocalProfile[field] || localExt[field];
+            if (val !== undefined && val !== null) {
+                const dbField = field === 'schoolId' ? 'school_id' : field === 'schoolName' ? 'school_name' : field.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+                profileUpdates[dbField] = val;
+            }
+        });
+
+        if (Object.keys(profileUpdates).length > 0) {
+            console.log('[DB] Syncing profile updates:', Object.keys(profileUpdates));
+            try {
+                await supabase!.from('profiles').update(profileUpdates).eq('id', supabaseUserId);
+            } catch (err) {
+                console.warn('[DB] Profile field sync failed:', err);
+            }
         }
     },
 
