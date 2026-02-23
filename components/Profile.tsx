@@ -49,7 +49,7 @@ const HistorySection: React.FC<{ records: PointRecord[] }> = ({ records }) => {
         className="w-full flex items-center justify-between mb-3 group"
       >
         <h4 className="text-sm font-bold text-white/60 flex items-center gap-2">
-          <History size={14} className="text-blue-400" /> 历史战绩
+          <History size={14} className="text-blue-400" /> 积分记录
           {earned.length > 0 && (
             <span className="text-[10px] bg-white/8 px-1.5 py-0.5 rounded-full text-white/30">{earned.length}</span>
           )}
