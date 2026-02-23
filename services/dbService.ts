@@ -601,7 +601,8 @@ export const dbService = {
             const fetchPromise = (async () => {
                 const { data: profiles, error: pError } = await supabase
                     .from('profiles')
-                    .select('*');
+                    .select('id, name, avatar, province, city, school_id, school_name, grade, total_points, high_score')
+                    .limit(1000); // Reasonable limit for a leaderboard query
 
                 if (pError) {
                     if (pError.code === 'PGRST205') {
@@ -610,17 +611,11 @@ export const dbService = {
                     throw pError;
                 }
 
-                const { data: leaderboard, error: lError } = await supabase
-                    .from('leaderboard')
-                    .select('*');
-
-                if (lError) throw lError;
-
-                return { profiles, leaderboard };
+                return { profiles };
             })();
 
             const result = await Promise.race([fetchPromise, timeoutPromise]) as any;
-            const { profiles, leaderboard } = result;
+            const { profiles } = result;
 
             return profiles.map((p: any) => {
                 return {
@@ -779,17 +774,37 @@ export const dbService = {
      * Fetch rankings by scope
      */
     async fetchRankings(scope: 'school' | 'city' | 'province' | 'global', currentUser: UserProfile) {
-        const allUsers = await this.fetchAllUsers();
+        try {
+            const allUsers = await this.fetchAllUsers();
+            if (!allUsers || allUsers.length === 0) return [];
 
-        let filtered = allUsers;
-        if (scope === 'school' && currentUser.schoolId) {
-            filtered = allUsers.filter(u => u.schoolId === currentUser.schoolId);
-        } else if (scope === 'city' && currentUser.city) {
-            filtered = allUsers.filter(u => u.city === currentUser.city);
-        } else if (scope === 'province' && currentUser.province) {
-            filtered = allUsers.filter(u => u.province === currentUser.province);
+            let filtered = allUsers;
+            if (scope === 'school' && currentUser.schoolId) {
+                filtered = allUsers.filter(u => u.schoolId === currentUser.schoolId);
+            } else if (scope === 'city' && currentUser.city) {
+                filtered = allUsers.filter(u => u.city === currentUser.city);
+            } else if (scope === 'province' && currentUser.province) {
+                filtered = allUsers.filter(u => u.province === currentUser.province);
+            }
+
+            // Sort by points
+            const sorted = [...filtered].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+
+            // Limit to top 100
+            let results = sorted.slice(0, 100);
+
+            // Ensure the current user is always in the list if they are in the filtered set
+            const hasMe = results.some(u => u.name === currentUser.name);
+            if (!hasMe) {
+                const me = filtered.find(u => u.name === currentUser.name);
+                if (me) results.push(me);
+            }
+
+            return results;
+        } catch (error) {
+            console.error('Failed to fetch rankings:', error);
+            // Return at least the current user so the leaderboard isn't totally empty
+            return [currentUser];
         }
-
-        return filtered.sort((a, b) => b.totalPoints - a.totalPoints).slice(0, 100);
     }
 };
