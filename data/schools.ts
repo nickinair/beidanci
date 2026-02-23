@@ -15,6 +15,10 @@ export const SCHOOLS: School[] = [
     { id: 's_bj_hd_9', name: '海淀区教师进修学校附属实验学校', type: 'junior', province: 'bj', city: 'bj_bj', district: 'bj_hd' },
     { id: 's_bj_hd_10', name: '十一学校', type: 'junior', province: 'bj', city: 'bj_bj', district: 'bj_hd' },
     { id: 's_bj_hd_11', name: '北外附校', type: 'junior', province: 'bj', city: 'bj_bj', district: 'bj_hd' },
+    { id: 'u_bj_hd_1', name: '北京大学', type: 'university', province: 'bj', city: 'bj_bj', district: 'bj_hd' },
+    { id: 'u_bj_hd_2', name: '清华大学', type: 'university', province: 'bj', city: 'bj_bj', district: 'bj_hd' },
+    { id: 'u_bj_hd_3', name: '中国人民大学', type: 'university', province: 'bj', city: 'bj_bj', district: 'bj_hd' },
+    { id: 'u_bj_hd_4', name: '北京师范大学', type: 'university', province: 'bj', city: 'bj_bj', district: 'bj_hd' },
 
     // 东城区 (bj_dc)
     { id: 's_bj_dc_1', name: '北京市府学胡同小学', type: 'primary', province: 'bj', city: 'bj_bj', district: 'bj_dc' },
@@ -88,6 +92,9 @@ export const SCHOOLS: School[] = [
     { id: 's_sh_ja_4', name: '育才中学', type: 'senior', province: 'sh', city: 'sh_sh', district: 'sh_ja' },
     { id: 's_sh_ja_5', name: '市北初级中学', type: 'junior', province: 'sh', city: 'sh_sh', district: 'sh_ja' },
     { id: 's_sh_ja_6', name: '静教院附校', type: 'junior', province: 'sh', city: 'sh_sh', district: 'sh_ja' },
+    { id: 'u_sh_xh_1', name: '上海交通大学', type: 'university', province: 'sh', city: 'sh_sh', district: 'sh_xh' },
+    { id: 'u_sh_cn_1', name: '复旦大学', type: 'university', province: 'sh', city: 'sh_sh', district: 'sh_cn' },
+    { id: 'u_sh_ja_1', name: '上海大学', type: 'university', province: 'sh', city: 'sh_sh', district: 'sh_ja' },
 
     // ============ 广东省 ============
 
@@ -143,4 +150,7 @@ export const SCHOOLS: School[] = [
     { id: 's_gz_hz_5', name: '南武中学', type: 'senior', province: 'gd', city: 'gd_gz', district: 'gd_gz_hz' },
     { id: 's_gz_hz_6', name: '广州市第九十七中学', type: 'junior', province: 'gd', city: 'gd_gz', district: 'gd_gz_hz' },
     { id: 's_gz_hz_7', name: '海珠外国语实验中学', type: 'junior', province: 'gd', city: 'gd_gz', district: 'gd_gz_hz' },
+    { id: 'u_gz_th_1', name: '中山大学', type: 'university', province: 'gd', city: 'gd_gz', district: 'gd_gz_th' },
+    { id: 'u_gz_th_2', name: '华南理工大学', type: 'university', province: 'gd', city: 'gd_gz', district: 'gd_gz_th' },
+    { id: 'u_sz_ns_1', name: '深圳大学', type: 'university', province: 'gd', city: 'gd_sz', district: 'gd_sz_ns' },
 ];

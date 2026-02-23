@@ -5,7 +5,7 @@ import { Trophy, Play, History, Info, ChevronLeft, Briefcase, Sparkles, Calendar
 
 interface HomeProps {
   user: UserProfile;
-  onStart: (level: 'primary' | 'junior' | 'senior', grade?: number) => void;
+  onStart: (level: 'primary' | 'junior' | 'senior' | 'university', grade?: number) => void;
   onViewRewards: () => void;
   onViewRules: () => void;
   onViewErrorBook: () => void;
@@ -13,7 +13,7 @@ interface HomeProps {
   onViewProfile?: () => void;
 }
 
-type LevelType = 'primary' | 'junior' | 'senior' | null;
+type LevelType = 'primary' | 'junior' | 'senior' | 'university' | null;
 
 const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, onViewErrorBook, onCheckIn, onViewProfile }) => {
   const [selectedLevel, setSelectedLevel] = useState<LevelType>(null);
@@ -23,25 +23,27 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, 
   const hasCheckedInToday = user.lastCheckIn === today;
 
   // Grade restriction helpers
-  const getUserLevel = (): 'primary' | 'junior' | 'senior' | null => {
+  const getUserLevel = (): 'primary' | 'junior' | 'senior' | 'university' | null => {
     if (!user.grade) return null;
     if (user.grade <= 6) return 'primary';
     if (user.grade <= 9) return 'junior';
-    return 'senior';
+    if (user.grade <= 12) return 'senior';
+    return 'university';
   };
 
-  const getLevelMinGrade = (level: 'primary' | 'junior' | 'senior'): number => {
+  const getLevelMinGrade = (level: 'primary' | 'junior' | 'senior' | 'university'): number => {
     switch (level) {
       case 'primary': return 1;
       case 'junior': return 7;
       case 'senior': return 10;
+      case 'university': return 13;
     }
   };
 
-  const isLevelLocked = (level: 'primary' | 'junior' | 'senior'): boolean => {
+  const isLevelLocked = (level: 'primary' | 'junior' | 'senior' | 'university'): boolean => {
     const userLevel = getUserLevel();
     if (!userLevel || !user.grade) return false; // No grade set = no restriction
-    const levelOrder = { 'primary': 0, 'junior': 1, 'senior': 2 };
+    const levelOrder = { 'primary': 0, 'junior': 1, 'senior': 2, 'university': 3 };
     return levelOrder[level] < levelOrder[userLevel];
   };
 
@@ -64,6 +66,7 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, 
       case 'primary': return '小学';
       case 'junior': return '初中';
       case 'senior': return '高中';
+      case 'university': return '大学';
       default: return '';
     }
   };
@@ -71,7 +74,8 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, 
   const getGradeName = (grade: number) => {
     if (grade <= 6) return `${grade}年级`;
     if (grade <= 9) return `初${grade - 6}`;
-    return `高${grade - 9}`;
+    if (grade <= 12) return `高${grade - 9}`;
+    return `大${grade - 12}`;
   };
 
   const getLockedText = () => {
@@ -83,6 +87,7 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, 
     { id: 'primary' as const, label: '小学组', gradient: 'from-blue-500 to-cyan-500', glow: 'glow-blue' },
     { id: 'junior' as const, label: '初中组', gradient: 'from-amber-500 to-orange-500', glow: '' },
     { id: 'senior' as const, label: '高中组', gradient: 'from-purple-500 to-pink-500', glow: 'glow-purple' },
+    { id: 'university' as const, label: '大学组', gradient: 'from-rose-500 to-red-600', glow: '' },
   ];
 
   return (
@@ -110,8 +115,8 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, 
                 onClick={hasCheckedInToday ? undefined : onCheckIn}
                 disabled={hasCheckedInToday}
                 className={`flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md border transition-all ${hasCheckedInToday
-                    ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10 opacity-80'
-                    : 'text-amber-400 border-amber-500/50 bg-amber-500/20 active:bg-amber-500/30 active:scale-95'
+                  ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10 opacity-80'
+                  : 'text-amber-400 border-amber-500/50 bg-amber-500/20 active:bg-amber-500/30 active:scale-95'
                   }`}
               >
                 <CalendarCheck size={10} />

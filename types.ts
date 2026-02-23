@@ -39,7 +39,7 @@ export interface QuizResult {
 export interface School {
   id: string;
   name: string;
-  type: 'primary' | 'junior' | 'senior';
+  type: 'primary' | 'junior' | 'senior' | 'university';
   province: string;
   city: string;
   district: string;

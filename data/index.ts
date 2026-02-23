@@ -3,14 +3,16 @@ import { Word } from '../types';
 import { primaryWords } from './primary';
 import { juniorWords } from './junior';
 import { seniorWords } from './senior';
+import { universityWords } from './university';
 
 export const allWords = {
     primary: primaryWords,
     junior: juniorWords,
     senior: seniorWords,
+    university: universityWords,
 };
 
-export const getWordsByLevelAndGrade = (level: 'primary' | 'junior' | 'senior', grade?: number): Word[] => {
+export const getWordsByLevelAndGrade = (level: 'primary' | 'junior' | 'senior' | 'university', grade?: number): Word[] => {
     let words: Word[] = [];
 
     switch (level) {
@@ -22,6 +24,9 @@ export const getWordsByLevelAndGrade = (level: 'primary' | 'junior' | 'senior', 
             break;
         case 'senior':
             words = seniorWords;
+            break;
+        case 'university':
+            words = universityWords;
             break;
         default:
             return [];

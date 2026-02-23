@@ -3,7 +3,7 @@ import { Word, Question } from '../types';
 import { QUESTIONS_PER_ROUND } from '../constants';
 import { getWordsByLevelAndGrade } from '../data';
 
-export const generateQuiz = (level: 'primary' | 'junior' | 'senior', grade?: number): Question[] => {
+export const generateQuiz = (level: 'primary' | 'junior' | 'senior' | 'university', grade?: number): Question[] => {
   const allRelatedWords = getWordsByLevelAndGrade(level, grade);
 
   if (allRelatedWords.length === 0) {

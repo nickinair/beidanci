@@ -118,7 +118,7 @@ const App: React.FC = () => {
     setAppState('login');
   };
 
-  const startNewChallenge = (level: 'primary' | 'junior' | 'senior', grade?: number) => {
+  const startNewChallenge = (level: 'primary' | 'junior' | 'senior' | 'university', grade?: number) => {
     const quiz = generateQuiz(level, grade);
     setCurrentQuiz(quiz);
     setAppState('quiz');
@@ -158,6 +158,13 @@ const App: React.FC = () => {
         history: [result, ...currentUser.history],
         pointRecords: newRecords
       };
+
+      // Persist the updated balance and high score to the profiles table
+      await dbService.updateProfile(updatedUser.id, {
+        totalPoints: updatedUser.totalPoints,
+        highScore: updatedUser.highScore
+      });
+
       setCurrentUser(updatedUser);
       // Sync local lists
       setAllUsers(prev => prev.map(u => u.name === updatedUser.name ? updatedUser : u));

@@ -14,7 +14,7 @@ const ProfileSetup: React.FC<ProfileSetupProps> = ({ user, onComplete }) => {
     const [provinceId, setProvinceId] = useState(user.province || '');
     const [cityId, setCityId] = useState(user.city || '');
     const [districtId, setDistrictId] = useState(user.district || '');
-    const [schoolType, setSchoolType] = useState<'primary' | 'junior' | 'senior'>((user.grade && user.grade > 9 ? 'senior' : user.grade && user.grade > 6 ? 'junior' : 'primary') as any);
+    const [schoolType, setSchoolType] = useState<'primary' | 'junior' | 'senior' | 'university'>((user.grade && user.grade > 12 ? 'university' : user.grade && user.grade > 9 ? 'senior' : user.grade && user.grade > 6 ? 'junior' : 'primary') as any);
     const [schoolId, setSchoolId] = useState(user.schoolId || '');
     const [grade, setGrade] = useState(user.grade || 1);
     const [nickname, setNickname] = useState(user.name?.startsWith('User_') ? '' : user.name);
@@ -102,10 +102,10 @@ const ProfileSetup: React.FC<ProfileSetupProps> = ({ user, onComplete }) => {
                             <h3 className="text-sm font-semibold text-white/60">选择学校</h3>
                         </div>
                         <div className="flex gap-1.5">
-                            {(['primary', 'junior', 'senior'] as const).map(type => (
+                            {(['primary', 'junior', 'senior', 'university'] as const).map(type => (
                                 <button key={type} type="button" onClick={() => setSchoolType(type)}
                                     className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${schoolType === type ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white/5 text-white/30 hover:text-white/50'}`}>
-                                    {type === 'primary' ? '小学' : type === 'junior' ? '初中' : '高中'}
+                                    {type === 'primary' ? '小学' : type === 'junior' ? '初中' : type === 'senior' ? '高中' : '大学'}
                                 </button>
                             ))}
                         </div>
@@ -142,14 +142,15 @@ const ProfileSetup: React.FC<ProfileSetupProps> = ({ user, onComplete }) => {
                             <h3 className="text-sm font-semibold text-white/60">选择年级</h3>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].filter(g => {
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].filter(g => {
                                 if (schoolType === 'primary') return g <= 6;
                                 if (schoolType === 'junior') return g >= 7 && g <= 9;
-                                return g >= 10;
+                                if (schoolType === 'senior') return g >= 10 && g <= 12;
+                                return g >= 13;
                             }).map(g => (
                                 <button key={`grade-${g}`} type="button" onClick={() => setGrade(g)}
                                     className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all ${grade === g ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/5 text-white/30 hover:text-white/50'}`}>
-                                    {g > 9 ? `高${g - 9}` : g > 6 ? `初${g - 6}` : `${g}年级`}
+                                    {g > 12 ? `大${g - 12}` : g > 9 ? `高${g - 9}` : g > 6 ? `初${g - 6}` : `${g}年级`}
                                 </button>
                             ))}
                         </div>
