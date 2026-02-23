@@ -256,7 +256,7 @@ const App: React.FC = () => {
           <Home
             user={currentUser}
             onStart={startNewChallenge}
-            onViewHistory={() => setAppState('history')}
+            onViewRewards={() => setAppState('rewards')}
             onViewRules={() => setAppState('rules')}
             onViewErrorBook={() => setAppState('error-book')}
             onCheckIn={handleCheckIn}

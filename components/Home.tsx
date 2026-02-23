@@ -6,7 +6,7 @@ import { Trophy, Play, History, Info, ChevronLeft, Briefcase, Sparkles, Calendar
 interface HomeProps {
   user: UserProfile;
   onStart: (level: 'primary' | 'junior' | 'senior', grade?: number) => void;
-  onViewHistory: () => void;
+  onViewRewards: () => void;
   onViewRules: () => void;
   onViewErrorBook: () => void;
   onCheckIn: () => void;
@@ -15,7 +15,7 @@ interface HomeProps {
 
 type LevelType = 'primary' | 'junior' | 'senior' | null;
 
-const Home: React.FC<HomeProps> = ({ user, onStart, onViewHistory, onViewRules, onViewErrorBook, onCheckIn, onViewProfile }) => {
+const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, onViewErrorBook, onCheckIn, onViewProfile }) => {
   const [selectedLevel, setSelectedLevel] = useState<LevelType>(null);
 
   // Check-in state
@@ -209,9 +209,9 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewHistory, onViewRules, 
 
       {/* Quick Actions */}
       <div className="mt-6 grid grid-cols-2 gap-3">
-        <button onClick={onViewHistory} className="flex items-center justify-center gap-2 glass-light py-3 rounded-xl text-white/60 text-sm font-medium hover:bg-white/8 transition-colors">
-          <History size={16} />
-          答题历史
+        <button onClick={onViewRewards} className="flex items-center justify-center gap-2 glass-light py-3 rounded-xl text-white/60 text-sm font-medium hover:bg-white/8 transition-colors">
+          <Gift size={16} className="text-amber-400" />
+          福利社
         </button>
         <button onClick={onViewErrorBook} className="flex items-center justify-center gap-2 glass-light py-3 rounded-xl text-white/60 text-sm font-medium hover:bg-white/8 transition-colors">
           <Briefcase size={16} />
