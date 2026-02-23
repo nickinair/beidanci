@@ -25,7 +25,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users: initialUsers, currentU
       setLoading(true);
       try {
         const ranked = await dbService.fetchRankings(scope, currentUser);
-        setDisplayUsers(ranked);
+        // Patch the fetched list with the local authoritative state for the current user
+        // This resolves the "stale data" issue where the DB fetch might return 
+        // older points if the update is still in flight.
+        const patched = ranked.map(u => u.name === currentUser.name ? { ...u, totalPoints: currentUser.totalPoints } : u);
+        setDisplayUsers(patched);
       } catch (err) {
         console.error(err);
       } finally {
