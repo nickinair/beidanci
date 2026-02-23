@@ -143,7 +143,10 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, 
               {user.grade && getUserLevel() && (
                 <>
                   <button
-                    onClick={() => onStart(getUserLevel()!, user.grade!)}
+                    onClick={() => {
+                      const level = getUserLevel();
+                      if (level) onStart(level, level === 'university' ? undefined : user.grade);
+                    }}
                     className="w-full text-white font-bold py-4 rounded-2xl text-xl transition-all flex items-center justify-center gap-3 bg-gradient-to-r from-emerald-500 to-teal-400 hover:scale-[1.02] active:scale-[0.98] glow-green border border-emerald-400/30"
                   >
                     <Play size={24} fill="currentColor" />
@@ -165,7 +168,14 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, 
                 return (
                   <button
                     key={lc.id}
-                    onClick={() => locked ? null : setSelectedLevel(lc.id)}
+                    onClick={() => {
+                      if (locked) return;
+                      if (lc.id === 'university') {
+                        onStart('university');
+                      } else {
+                        setSelectedLevel(lc.id);
+                      }
+                    }}
                     disabled={locked}
                     className={`w-full text-white font-semibold py-4 rounded-2xl text-lg transition-all flex items-center justify-center gap-3 ${locked
                       ? 'bg-white/5 opacity-40 cursor-not-allowed'
