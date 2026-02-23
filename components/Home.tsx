@@ -95,9 +95,9 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, 
       {/* User Info Bar - clickable to go to profile */}
       <div className="flex items-center justify-between glass-light rounded-2xl p-3 mb-6 w-full text-left transition-all relative overflow-hidden">
         {/* Profile section (left) */}
-        <button
+        <div
           onClick={onViewProfile}
-          className="flex items-center gap-3 flex-1 hover:opacity-80 transition-opacity text-left"
+          className="flex items-center gap-3 flex-1 hover:opacity-80 transition-opacity text-left cursor-pointer"
         >
           <img src={user.avatar} alt="" className="w-10 h-10 rounded-full border-2 border-white/10 object-cover" />
           <div>
@@ -112,7 +112,10 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, 
               </div>
 
               <button
-                onClick={hasCheckedInToday ? undefined : onCheckIn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!hasCheckedInToday) onCheckIn();
+                }}
                 disabled={hasCheckedInToday}
                 className={`flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md border transition-all ${hasCheckedInToday
                   ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10 opacity-80'
@@ -124,7 +127,7 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, 
               </button>
             </div>
           </div>
-        </button>
+        </div>
 
         {/* We removed the large check-in banner, saving vertical space */}
       </div>
