@@ -17,6 +17,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users: initialUsers, currentU
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    setDisplayUsers(initialUsers);
+  }, [initialUsers]);
+
+  useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
@@ -29,7 +33,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users: initialUsers, currentU
       }
     };
     fetchData();
-  }, [scope, currentUser.id, currentUser.schoolId, currentUser.city, currentUser.province]);
+  }, [scope, currentUser.id, currentUser.totalPoints, currentUser.schoolId, currentUser.city, currentUser.province]);
 
   const myRank = displayUsers.findIndex(u => u.name === currentUser.name) + 1;
   const myScore = currentUser.totalPoints;
