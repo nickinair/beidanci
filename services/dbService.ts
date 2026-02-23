@@ -568,25 +568,18 @@ export const dbService = {
         }
 
         const { data, error } = await supabase
-            .from('leaderboard')
-            .select(`
-        total_points,
-        profiles (
-          name,
-          avatar,
-          high_score
-        )
-      `)
+            .from('profiles')
+            .select('name, avatar, high_score, total_points')
             .order('total_points', { ascending: false })
             .limit(50);
 
         if (error) throw error;
 
         return data.map(item => ({
-            name: (item.profiles as any).name,
-            avatar: (item.profiles as any).avatar,
-            totalPoints: item.total_points,
-            highScore: (item.profiles as any).high_score || 0
+            name: item.name,
+            avatar: item.avatar,
+            totalPoints: item.total_points || 0,
+            highScore: item.high_score || 0
         }));
     },
 

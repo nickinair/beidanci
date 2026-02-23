@@ -6,30 +6,22 @@ import { dbService } from '../services/dbService';
 
 interface LeaderboardProps {
   users: UserProfile[];
-  currentUserName: string;
+  currentUser: UserProfile;
 }
 
 type Scope = 'school' | 'city' | 'province' | 'global';
 
-const Leaderboard: React.FC<LeaderboardProps> = ({ users: initialUsers, currentUserName }) => {
+const Leaderboard: React.FC<LeaderboardProps> = ({ users: initialUsers, currentUser }) => {
   const [scope, setScope] = useState<Scope>('school');
   const [displayUsers, setDisplayUsers] = useState<UserProfile[]>(initialUsers);
   const [loading, setLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState<UserProfile | undefined>(initialUsers.find(u => u.name === currentUserName));
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const all = await dbService.fetchAllUsers();
-        const me = all.find(u => u.name === currentUserName);
-        setCurrentUser(me);
-        if (me) {
-          const ranked = await dbService.fetchRankings(scope, me);
-          setDisplayUsers(ranked);
-        } else {
-          setDisplayUsers([]);
-        }
+        const ranked = await dbService.fetchRankings(scope, currentUser);
+        setDisplayUsers(ranked);
       } catch (err) {
         console.error(err);
       } finally {
@@ -37,10 +29,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users: initialUsers, currentU
       }
     };
     fetchData();
-  }, [scope, currentUserName]);
+  }, [scope, currentUser.id, currentUser.schoolId, currentUser.city, currentUser.province]);
 
-  const myRank = displayUsers.findIndex(u => u.name === currentUserName) + 1;
-  const myScore = currentUser?.totalPoints || 0;
+  const myRank = displayUsers.findIndex(u => u.name === currentUser.name) + 1;
+  const myScore = currentUser.totalPoints;
 
   const getRankDisplay = (index: number) => {
     switch (index) {
@@ -89,7 +81,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users: initialUsers, currentU
           <div className="text-center py-10 text-white/20 font-medium">暂无数据，快来占领榜首！</div>
         ) : (
           displayUsers.map((user, index) => {
-            const isMe = user.name === currentUserName;
+            const isMe = user.name === currentUser.name;
             return (
               <div key={user.name} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${isMe ? 'glass-light border border-blue-400/20' : 'glass'}`}>
                 <div className="w-6 flex justify-center">{getRankDisplay(index)}</div>

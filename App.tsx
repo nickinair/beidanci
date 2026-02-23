@@ -151,13 +151,18 @@ const App: React.FC = () => {
       ] : currentUser.pointRecords;
 
       setLastResult(result);
-      setCurrentUser({
+      const updatedUser = {
         ...currentUser,
         totalPoints: currentUser.totalPoints + points,
         highScore: Math.max(currentUser.highScore, score),
         history: [result, ...currentUser.history],
         pointRecords: newRecords
-      });
+      };
+      setCurrentUser(updatedUser);
+      // Sync local lists
+      setAllUsers(prev => prev.map(u => u.name === updatedUser.name ? updatedUser : u));
+      setLeaderboardUsers(prev => prev.map(u => u.name === updatedUser.name ? { ...u, totalPoints: updatedUser.totalPoints } : u));
+
       setAppState('result');
     } catch (error) {
       console.error('Failed to save result:', error);
@@ -194,6 +199,9 @@ const App: React.FC = () => {
       pointRecords: [...currentUser.pointRecords, record],
     };
     setCurrentUser(updated);
+    // Sync local lists
+    setAllUsers(prev => prev.map(u => u.name === updated.name ? updated : u));
+    setLeaderboardUsers(prev => prev.map(u => u.name === updated.name ? { ...u, totalPoints: updated.totalPoints } : u));
     if (currentUser.id) {
       dbService.updateProfile(currentUser.id, {
         totalPoints: updated.totalPoints,
@@ -211,7 +219,11 @@ const App: React.FC = () => {
     if (!currentUser) return;
     const newPoints = currentUser.totalPoints - amount;
     const record: PointRecord = { amount: -amount, reason, timestamp: Date.now() };
-    setCurrentUser({ ...currentUser, totalPoints: newPoints, pointRecords: [...currentUser.pointRecords, record] });
+    const updated = { ...currentUser, totalPoints: newPoints, pointRecords: [...currentUser.pointRecords, record] };
+    setCurrentUser(updated);
+    // Sync local lists
+    setAllUsers(prev => prev.map(u => u.name === updated.name ? updated : u));
+    setLeaderboardUsers(prev => prev.map(u => u.name === updated.name ? { ...u, totalPoints: updated.totalPoints } : u));
     if (currentUser.id) {
       // Save updated total AND the point record (negative) to Supabase
       dbService.updateProfile(currentUser.id, { totalPoints: newPoints }).catch(console.error);
@@ -267,7 +279,7 @@ const App: React.FC = () => {
         {appState === 'leaderboard' && currentUser && (
           <Leaderboard
             users={leaderboardUsers}
-            currentUserName={currentUser.name}
+            currentUser={currentUser}
           />
         )}
 
