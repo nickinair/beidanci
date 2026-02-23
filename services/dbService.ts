@@ -202,10 +202,9 @@ export const dbService = {
         if (updates.schoolId !== undefined) dbUpdates.school_id = updates.schoolId;
         if (updates.schoolName !== undefined) dbUpdates.school_name = updates.schoolName;
         if (updates.grade !== undefined) dbUpdates.grade = updates.grade;
-        // NOTE: Do NOT write total_points to profiles — the leaderboard table
-        // (managed by a DB trigger aggregating user_points) is the single source
-        // of truth for points. Writing total_points here would inflate the profile
-        // value and cause a mismatch with the leaderboard.
+        // profiles.total_points is the authoritative running balance.
+        // It is updated atomically here whenever points change.
+        if (updates.totalPoints !== undefined) dbUpdates.total_points = updates.totalPoints;
         if (updates.highScore !== undefined) dbUpdates.high_score = updates.highScore;
         if (updates.lastCheckIn !== undefined) dbUpdates.last_check_in = updates.lastCheckIn;
         if (updates.checkInStreak !== undefined) dbUpdates.check_in_streak = updates.checkInStreak;
@@ -521,10 +520,11 @@ export const dbService = {
     },
 
     /**
-     * Fetch total points - uses leaderboard table as single source of truth.
-     * The leaderboard table is maintained by a DB trigger that sums all user_points
-     * rows, including negative redemption deductions. Do NOT use Math.max with
-     * profiles.total_points as that field can be stale / inflated by direct writes.
+     * Fetch total points - uses profiles.total_points as the authoritative balance.
+     * This field is explicitly written whenever points change (quiz, check-in, redemption),
+     * making it the most reliable single source of truth.
+     * The leaderboard table can accumulate incorrectly due to trigger double-fires
+     * from pending-point syncs, so we avoid using it for the user's own balance.
      */
     async fetchUserTotalPoints(userId: string) {
         if (!supabase) {
@@ -534,29 +534,14 @@ export const dbService = {
             return { total_points: total };
         }
 
-        // Primary source: leaderboard table (trigger-computed sum of all user_points)
-        const leaderboardRes = await supabase
-            .from('leaderboard')
+        // Primary source: profiles.total_points (explicitly maintained running balance)
+        const profileRes = await supabase
+            .from('profiles')
             .select('total_points')
-            .eq('user_id', userId)
+            .eq('id', userId)
             .maybeSingle();
 
-        if (leaderboardRes.data != null) {
-            return { total_points: leaderboardRes.data.total_points || 0 };
-        }
-
-        // Fallback: if no leaderboard entry exists yet, compute from user_points directly
-        const pointsRes = await supabase
-            .from('user_points')
-            .select('amount')
-            .eq('user_id', userId);
-
-        if (!pointsRes.error && pointsRes.data) {
-            const total = pointsRes.data.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-            return { total_points: total };
-        }
-
-        return { total_points: 0 };
+        return { total_points: profileRes.data?.total_points || 0 };
     },
 
     /**
@@ -645,7 +630,6 @@ export const dbService = {
             const { profiles, leaderboard } = result;
 
             return profiles.map((p: any) => {
-                const l = leaderboard.find((lb: any) => lb.user_id === p.id);
                 return {
                     id: p.id,
                     name: p.name,
@@ -655,7 +639,9 @@ export const dbService = {
                     schoolId: p.school_id,
                     schoolName: p.school_name,
                     grade: p.grade,
-                    totalPoints: l?.total_points || 0,
+                    // Use profiles.total_points as authoritative balance (consistently maintained).
+                    // The leaderboard table can be corrupted by trigger double-fires.
+                    totalPoints: p.total_points || 0,
                     highScore: p.high_score || 0,
                     history: [],
                     pointRecords: [],

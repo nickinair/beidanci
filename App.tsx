@@ -260,6 +260,7 @@ const App: React.FC = () => {
             onViewRules={() => setAppState('rules')}
             onViewErrorBook={() => setAppState('error-book')}
             onCheckIn={handleCheckIn}
+            onViewProfile={() => setAppState('profile')}
           />
         )}
 

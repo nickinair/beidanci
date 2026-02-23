@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { UserProfile } from '../types';
-import { Trophy, Play, History, Info, ChevronLeft, Briefcase, Sparkles, CalendarCheck, Lock, Gift } from 'lucide-react';
+import { Trophy, Play, History, Info, ChevronLeft, Briefcase, Sparkles, CalendarCheck, Lock, Gift, ChevronRight } from 'lucide-react';
 
 interface HomeProps {
   user: UserProfile;
@@ -10,11 +10,12 @@ interface HomeProps {
   onViewRules: () => void;
   onViewErrorBook: () => void;
   onCheckIn: () => void;
+  onViewProfile?: () => void;
 }
 
 type LevelType = 'primary' | 'junior' | 'senior' | null;
 
-const Home: React.FC<HomeProps> = ({ user, onStart, onViewHistory, onViewRules, onViewErrorBook, onCheckIn }) => {
+const Home: React.FC<HomeProps> = ({ user, onStart, onViewHistory, onViewRules, onViewErrorBook, onCheckIn, onViewProfile }) => {
   const [selectedLevel, setSelectedLevel] = useState<LevelType>(null);
 
   // Check-in state
@@ -86,8 +87,11 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewHistory, onViewRules, 
 
   return (
     <div className="flex flex-col h-full">
-      {/* User Info Bar */}
-      <div className="flex items-center justify-between glass-light rounded-2xl p-3 mb-4">
+      {/* User Info Bar - clickable to go to profile */}
+      <button
+        onClick={onViewProfile}
+        className="flex items-center justify-between glass-light rounded-2xl p-3 mb-4 w-full text-left hover:bg-white/8 active:scale-[0.99] transition-all"
+      >
         <div className="flex items-center gap-3">
           <img src={user.avatar} alt="" className="w-10 h-10 rounded-full border-2 border-white/10 object-cover" />
           <div>
@@ -98,15 +102,16 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewHistory, onViewRules, 
             </div>
           </div>
         </div>
-      </div>
+        <ChevronRight size={16} className="text-white/20" />
+      </button>
 
       {/* Daily Check-in Banner */}
       <button
         onClick={hasCheckedInToday ? undefined : onCheckIn}
         disabled={hasCheckedInToday}
         className={`w-full flex items-center justify-between p-3.5 rounded-xl mb-4 transition-all ${hasCheckedInToday
-            ? 'glass border border-emerald-500/20 opacity-70'
-            : 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 hover:from-amber-500/30 hover:to-orange-500/30 active:scale-[0.98]'
+          ? 'glass border border-emerald-500/20 opacity-70'
+          : 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 hover:from-amber-500/30 hover:to-orange-500/30 active:scale-[0.98]'
           }`}
       >
         <div className="flex items-center gap-3">
@@ -148,8 +153,8 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewHistory, onViewRules, 
                     onClick={() => locked ? null : setSelectedLevel(lc.id)}
                     disabled={locked}
                     className={`w-full text-white font-semibold py-4 rounded-2xl text-lg transition-all flex items-center justify-center gap-3 ${locked
-                        ? 'bg-white/5 opacity-40 cursor-not-allowed'
-                        : `bg-gradient-to-r ${lc.gradient} hover:scale-[1.02] active:scale-[0.98] ${lc.glow}`
+                      ? 'bg-white/5 opacity-40 cursor-not-allowed'
+                      : `bg-gradient-to-r ${lc.gradient} hover:scale-[1.02] active:scale-[0.98] ${lc.glow}`
                       }`}
                   >
                     {locked ? <Lock size={18} /> : <Play size={22} fill="currentColor" />}
@@ -181,8 +186,8 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewHistory, onViewRules, 
                       onClick={() => locked ? null : onStart(selectedLevel, grade)}
                       disabled={locked}
                       className={`py-3.5 rounded-xl text-base font-semibold transition-all ${locked
-                          ? 'glass-light opacity-30 cursor-not-allowed text-white/30 flex items-center justify-center gap-1'
-                          : 'glass-light hover:bg-white/12 text-white active:scale-95'
+                        ? 'glass-light opacity-30 cursor-not-allowed text-white/30 flex items-center justify-center gap-1'
+                        : 'glass-light hover:bg-white/12 text-white active:scale-95'
                         }`}
                     >
                       {locked && <Lock size={12} />}
