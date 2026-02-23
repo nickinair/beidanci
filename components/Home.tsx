@@ -88,51 +88,41 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, 
   return (
     <div className="flex flex-col h-full">
       {/* User Info Bar - clickable to go to profile */}
-      <button
-        onClick={onViewProfile}
-        className="flex items-center justify-between glass-light rounded-2xl p-3 mb-4 w-full text-left hover:bg-white/8 active:scale-[0.99] transition-all"
-      >
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between glass-light rounded-2xl p-3 mb-6 w-full text-left transition-all relative overflow-hidden">
+        {/* Profile section (left) */}
+        <button
+          onClick={onViewProfile}
+          className="flex items-center gap-3 flex-1 hover:opacity-80 transition-opacity text-left"
+        >
           <img src={user.avatar} alt="" className="w-10 h-10 rounded-full border-2 border-white/10 object-cover" />
           <div>
-            <h2 className="text-sm font-semibold text-white">{user.name}</h2>
-            <div className="flex items-center gap-1 text-amber-400 text-xs font-medium">
-              <Trophy size={12} fill="currentColor" />
-              <span>{user.totalPoints} 积分</span>
+            <h2 className="text-sm font-semibold text-white flex items-center gap-1">
+              {user.name}
+              <ChevronRight size={14} className="text-white/30" />
+            </h2>
+            <div className="flex items-center gap-2 mt-0.5" onClick={(e) => e.stopPropagation() /* Prevent clicking points from opening profile */}>
+              <div className="flex items-center gap-1 text-amber-400 text-xs font-medium">
+                <Trophy size={12} fill="currentColor" />
+                <span>{user.totalPoints} 积分</span>
+              </div>
+
+              <button
+                onClick={hasCheckedInToday ? undefined : onCheckIn}
+                disabled={hasCheckedInToday}
+                className={`flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md border transition-all ${hasCheckedInToday
+                    ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10 opacity-80'
+                    : 'text-amber-400 border-amber-500/50 bg-amber-500/20 active:bg-amber-500/30 active:scale-95'
+                  }`}
+              >
+                <CalendarCheck size={10} />
+                {hasCheckedInToday ? '已签到' : '每日签到+20'}
+              </button>
             </div>
           </div>
-        </div>
-        <ChevronRight size={16} className="text-white/20" />
-      </button>
+        </button>
 
-      {/* Daily Check-in Banner */}
-      <button
-        onClick={hasCheckedInToday ? undefined : onCheckIn}
-        disabled={hasCheckedInToday}
-        className={`w-full flex items-center justify-between p-3.5 rounded-xl mb-4 transition-all ${hasCheckedInToday
-          ? 'glass border border-emerald-500/20 opacity-70'
-          : 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 hover:from-amber-500/30 hover:to-orange-500/30 active:scale-[0.98]'
-          }`}
-      >
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg ${hasCheckedInToday ? 'bg-emerald-500/15' : 'bg-amber-500/15'}`}>
-            <CalendarCheck size={18} className={hasCheckedInToday ? 'text-emerald-400' : 'text-amber-400'} />
-          </div>
-          <div className="text-left">
-            <span className={`font-semibold text-sm ${hasCheckedInToday ? 'text-emerald-400' : 'text-amber-400'}`}>
-              {hasCheckedInToday ? '✓ 今日已签到' : '每日签到 +20积分'}
-            </span>
-            <p className="text-[10px] text-white/25 mt-0.5">
-              {user.checkInStreak ? `已连续签到 ${user.checkInStreak} 天` : '坚持签到赢奖励'}
-              {!hasCheckedInToday && user.checkInStreak && user.checkInStreak >= 6 ? ' · 🎁 明日满7天奖励100积分' : ''}
-              {hasCheckedInToday && user.checkInStreak === 7 ? ' · 🎉 已获得连续7天奖励!' : ''}
-            </p>
-          </div>
-        </div>
-        {!hasCheckedInToday && (
-          <Gift size={16} className="text-amber-400/60" />
-        )}
-      </button>
+        {/* We removed the large check-in banner, saving vertical space */}
+      </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center text-center px-2">
@@ -145,6 +135,26 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, 
         <div className="space-y-3 w-full mt-8">
           {!selectedLevel ? (
             <>
+              {user.grade && getUserLevel() && (
+                <>
+                  <button
+                    onClick={() => onStart(getUserLevel()!, user.grade!)}
+                    className="w-full text-white font-bold py-4 rounded-2xl text-xl transition-all flex items-center justify-center gap-3 bg-gradient-to-r from-emerald-500 to-teal-400 hover:scale-[1.02] active:scale-[0.98] glow-green border border-emerald-400/30"
+                  >
+                    <Play size={24} fill="currentColor" />
+                    立即挑战
+                    <span className="text-sm font-medium bg-black/15 px-2 py-0.5 rounded-md ml-1">
+                      {getGradeName(user.grade)}
+                    </span>
+                  </button>
+
+                  <div className="flex items-center gap-4 py-1 opacity-60">
+                    <div className="flex-1 h-px bg-gradient-to-r from-transparent to-white/20"></div>
+                    <span className="text-xs font-medium text-white/50">其他级别</span>
+                    <div className="flex-1 h-px bg-gradient-to-l from-transparent to-white/20"></div>
+                  </div>
+                </>
+              )}
               {levelConfig.map(lc => {
                 const locked = isLevelLocked(lc.id);
                 return (

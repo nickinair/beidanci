@@ -1,9 +1,5 @@
 
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+import { supabase } from './supabaseClient';
 
 // ── Local cache (fallback when Supabase is unreachable) ──────────────────────
 const LS_AUTH_KEY = 'wordChallenge_auth_accounts';
