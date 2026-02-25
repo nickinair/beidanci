@@ -23,8 +23,6 @@ import { dbService } from './services/dbService';
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('login');
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
-  const [leaderboardUsers, setLeaderboardUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load persistence on mount
@@ -32,9 +30,6 @@ const App: React.FC = () => {
     const initApp = async () => {
       setIsLoading(true);
       try {
-        const users = await dbService.fetchAllUsers();
-        setAllUsers(users);
-
         const savedUsername = localStorage.getItem('wordChallenge_currentUser');
         if (savedUsername) {
           // If we have a saved user, try to log them in automatically
@@ -77,11 +72,7 @@ const App: React.FC = () => {
       setCurrentUser(fullUser);
       localStorage.setItem('wordChallenge_currentUser', username);
 
-      // Refresh user list
-      const users = await dbService.fetchAllUsers();
-      setAllUsers(users);
-
-      // Redirect logic
+      localStorage.setItem('wordChallenge_currentUser', username);
       if (!fullUser.schoolId) {
         setAppState('profile-setup');
       } else {
@@ -103,8 +94,6 @@ const App: React.FC = () => {
       const { totalPoints, highScore, history, pointRecords, ...safeExtended } = extended as any;
       const fullUser = { ...user, ...safeExtended };
       setCurrentUser(fullUser);
-      // Also update logic for leaderboard
-      setAllUsers(prev => prev.map(u => u.id === fullUser.id ? fullUser : u));
 
       if (redirectHome) {
         setAppState('home');
@@ -159,16 +148,7 @@ const App: React.FC = () => {
         pointRecords: newRecords
       };
 
-      // Persist the updated balance and high score to the profiles table
-      await dbService.updateProfile(updatedUser.id, {
-        totalPoints: updatedUser.totalPoints,
-        highScore: updatedUser.highScore
-      });
-
       setCurrentUser(updatedUser);
-      // Sync local lists
-      setAllUsers(prev => prev.map(u => u.name === updatedUser.name ? updatedUser : u));
-      setLeaderboardUsers(prev => prev.map(u => u.name === updatedUser.name ? { ...u, totalPoints: updatedUser.totalPoints } : u));
 
       setAppState('result');
     } catch (error) {
@@ -206,9 +186,6 @@ const App: React.FC = () => {
       pointRecords: [...currentUser.pointRecords, record],
     };
     setCurrentUser(updated);
-    // Sync local lists
-    setAllUsers(prev => prev.map(u => u.name === updated.name ? updated : u));
-    setLeaderboardUsers(prev => prev.map(u => u.name === updated.name ? { ...u, totalPoints: updated.totalPoints } : u));
     if (currentUser.id) {
       dbService.updateProfile(currentUser.id, {
         totalPoints: updated.totalPoints,
@@ -228,9 +205,6 @@ const App: React.FC = () => {
     const record: PointRecord = { amount: -amount, reason, timestamp: Date.now() };
     const updated = { ...currentUser, totalPoints: newPoints, pointRecords: [...currentUser.pointRecords, record] };
     setCurrentUser(updated);
-    // Sync local lists
-    setAllUsers(prev => prev.map(u => u.name === updated.name ? updated : u));
-    setLeaderboardUsers(prev => prev.map(u => u.name === updated.name ? { ...u, totalPoints: updated.totalPoints } : u));
     if (currentUser.id) {
       // Save updated total AND the point record (negative) to Supabase
       dbService.updateProfile(currentUser.id, { totalPoints: newPoints }).catch(console.error);
@@ -244,16 +218,7 @@ const App: React.FC = () => {
         <BottomNav
           currentTab={appState as any}
           onTabChange={(tab) => {
-            if (tab === 'leaderboard') {
-              // Pre-fetch if needed
-              setIsLoading(true);
-              dbService.fetchLeaderboard().then(rankings => {
-                setLeaderboardUsers(rankings as any);
-                setAppState(tab);
-              }).catch(err => console.error(err)).finally(() => setIsLoading(false));
-            } else {
-              setAppState(tab);
-            }
+            setAppState(tab);
           }}
         />
       ) : null}
@@ -285,7 +250,6 @@ const App: React.FC = () => {
 
         {appState === 'leaderboard' && currentUser && (
           <Leaderboard
-            users={leaderboardUsers}
             currentUser={currentUser}
           />
         )}

@@ -5,20 +5,16 @@ import { Trophy, Crown, Medal, Map, Building } from 'lucide-react';
 import { dbService } from '../services/dbService';
 
 interface LeaderboardProps {
-  users: UserProfile[];
   currentUser: UserProfile;
 }
 
 type Scope = 'school' | 'city' | 'province' | 'global';
 
-const Leaderboard: React.FC<LeaderboardProps> = ({ users: initialUsers, currentUser }) => {
+const Leaderboard: React.FC<LeaderboardProps> = ({ currentUser }) => {
   const [scope, setScope] = useState<Scope>('school');
-  const [displayUsers, setDisplayUsers] = useState<UserProfile[]>(initialUsers);
+  const [displayUsers, setDisplayUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setDisplayUsers(initialUsers);
-  }, [initialUsers]);
 
   useEffect(() => {
     const fetchData = async () => {

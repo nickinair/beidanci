@@ -211,9 +211,6 @@ export const dbService = {
         if (updates.schoolId !== undefined) dbUpdates.school_id = updates.schoolId;
         if (updates.schoolName !== undefined) dbUpdates.school_name = updates.schoolName;
         if (updates.grade !== undefined) dbUpdates.grade = updates.grade;
-        // profiles.total_points is the authoritative running balance.
-        // It is updated atomically here whenever points change.
-        if (updates.totalPoints !== undefined) dbUpdates.total_points = updates.totalPoints;
         if (updates.highScore !== undefined) dbUpdates.high_score = updates.highScore;
         if (updates.lastCheckIn !== undefined) dbUpdates.last_check_in = updates.lastCheckIn;
         if (updates.checkInStreak !== undefined) dbUpdates.check_in_streak = updates.checkInStreak;
@@ -305,7 +302,7 @@ export const dbService = {
 
                 if (pointRecord) {
                     const result2 = await withTimeout(
-                        Promise.resolve(supabase!.from('user_points').insert([pointRecord])),
+                        Promise.resolve(supabase!.from('user_points').upsert([pointRecord], { onConflict: 'user_id,amount,reason,timestamp' })),
                         8000
                     );
                     const pointsError = (result2 as any).error;
@@ -359,7 +356,7 @@ export const dbService = {
         (async () => {
             try {
                 const result = await withTimeout(
-                    Promise.resolve(supabase!.from('user_points').insert([record])),
+                    Promise.resolve(supabase!.from('user_points').upsert([record], { onConflict: 'user_id,amount,reason,timestamp' })),
                     8000
                 );
                 const error = (result as any).error;
@@ -368,7 +365,7 @@ export const dbService = {
                     const updated = this._getLocalData(LS_KEYS.PENDING_POINTS)
                         .filter((r: any) => !(r.user_id === userId && r.reason === reason && r.timestamp === record.timestamp));
                     this._setLocalData(LS_KEYS.PENDING_POINTS, updated);
-                    console.log('[DB] Point record saved to Supabase ✓', reason);
+                    console.log('[DB] Point record saved/upserted to Supabase ✓', reason);
                 } else {
                     console.error('[DB] Failed to save point record:', error);
                 }
@@ -440,10 +437,10 @@ export const dbService = {
 
         if (pendingPoints.length > 0) {
             console.log(`[DB] Syncing ${pendingPoints.length} pending point records...`);
-            totalPointsSynced = pendingPoints.reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
             try {
+                // Use upsert to prevent duplicates if any were partially synced
                 const r2 = await withTimeout(
-                    Promise.resolve(supabase!.from('user_points').insert(pendingPoints)),
+                    Promise.resolve(supabase!.from('user_points').upsert(pendingPoints, { onConflict: 'user_id,amount,reason,timestamp' })),
                     10000
                 );
                 const error = (r2 as any).error;
@@ -451,7 +448,7 @@ export const dbService = {
                     const remaining = this._getLocalData(LS_KEYS.PENDING_POINTS)
                         .filter((r: any) => r.user_id !== supabaseUserId);
                     this._setLocalData(LS_KEYS.PENDING_POINTS, remaining);
-                    console.log('[DB] Pending points synced ✓');
+                    console.log('[DB] Pending points synced via upsert ✓');
                 }
             } catch (e) { console.warn('[DB] Points sync failed:', e); }
         }
@@ -463,9 +460,8 @@ export const dbService = {
 
         // Prepare updates for the authoritative profiles table
         const profileUpdates: any = {};
-        if (totalPointsSynced !== 0) {
-            profileUpdates.total_points = currentBalance + totalPointsSynced;
-        }
+        // REMOVED: manual total_points calculation. Relying on DB triggers to keep this in sync
+        // based on the user_points table.
 
         // Sync fields from local profile (if set offline)
         const fieldsToSync = ['province', 'city', 'district', 'schoolId', 'schoolName', 'grade', 'phone', 'lastCheckIn', 'checkInStreak'];
@@ -818,10 +814,8 @@ export const dbService = {
      * Fetch rankings by scope
      */
     async fetchRankings(scope: 'school' | 'city' | 'province' | 'global', currentUser: UserProfile) {
-        try {
-            const allUsers = await this.fetchAllUsers();
-            if (!allUsers || allUsers.length === 0) return [];
-
+        if (!supabase) {
+            const allUsers = this._getOfflineUsers();
             let filtered = allUsers;
             if (scope === 'school' && currentUser.schoolId) {
                 filtered = allUsers.filter(u => u.schoolId === currentUser.schoolId);
@@ -830,24 +824,52 @@ export const dbService = {
             } else if (scope === 'province' && currentUser.province) {
                 filtered = allUsers.filter(u => u.province === currentUser.province);
             }
-
-            // Sort by points
             const sorted = [...filtered].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+            return sorted.slice(0, 100);
+        }
 
-            // Limit to top 100
-            let results = sorted.slice(0, 100);
+        try {
+            let query = supabase
+                .from('profiles')
+                .select('id, name, avatar, province, city, school_id, school_name, grade, total_points, high_score')
+                .order('total_points', { ascending: false });
 
-            // Ensure the current user is always in the list if they are in the filtered set
-            const hasMe = results.some(u => u.name === currentUser.name);
-            if (!hasMe) {
-                const me = filtered.find(u => u.name === currentUser.name);
-                if (me) results.push(me);
+            if (scope === 'school' && currentUser.schoolId) {
+                query = query.eq('school_id', currentUser.schoolId);
+            } else if (scope === 'city' && currentUser.city) {
+                query = query.eq('city', currentUser.city);
+            } else if (scope === 'province' && currentUser.province) {
+                query = query.eq('province', currentUser.province);
             }
 
+            // Top 100 only
+            const { data: profiles, error } = await query.limit(100);
+
+            if (error) throw error;
+
+            const results = (profiles || []).map((p: any) => ({
+                id: p.id,
+                name: p.name,
+                avatar: p.avatar,
+                province: p.province,
+                city: p.city,
+                schoolId: p.school_id,
+                schoolName: p.school_name,
+                grade: p.grade,
+                totalPoints: p.total_points || 0,
+                highScore: p.high_score || 0,
+                history: [],
+                pointRecords: [],
+                wrongQuestions: []
+            })) as UserProfile[];
+
+            // If current user is not in top 100, we should still handle them in the UI (Leaderboard component does this)
+            // But we might want to check if they are in the top 100 and if not, keep the current behavior of appending them?
+            // Actually, if we want to show their actual rank, we might need a separate query or a RPC call.
+            // For now, let's just return the top 100.
             return results;
         } catch (error) {
             console.error('Failed to fetch rankings:', error);
-            // Return at least the current user so the leaderboard isn't totally empty
             return [currentUser];
         }
     }

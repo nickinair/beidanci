@@ -36,10 +36,12 @@ CREATE TABLE IF NOT EXISTS public.user_points (
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
     amount INTEGER NOT NULL,
     reason TEXT NOT NULL,
-    timestamp TIMESTAMPTZ DEFAULT now()
+    timestamp TIMESTAMPTZ DEFAULT now(),
+    -- Prevent exact duplicate syncs
+    CONSTRAINT unique_point_record UNIQUE(user_id, amount, reason, timestamp)
 );
 
--- 4. Leaderboard Table
+-- 4. Leaderboard Table (Optional, but kept for legacy/caching if preferred)
 CREATE TABLE IF NOT EXISTS public.leaderboard (
     user_id UUID PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
     total_points INTEGER DEFAULT 0,
@@ -48,10 +50,16 @@ CREATE TABLE IF NOT EXISTS public.leaderboard (
 
 -- Functions and Triggers to auto-update Leaderboard and High Score
 
--- Update Leaderboard on Point Record Insertion
-CREATE OR REPLACE FUNCTION update_leaderboard_on_points()
+-- Update Leaderboard and Profile total_points on Point Record Insertion
+CREATE OR REPLACE FUNCTION update_points_aggregation()
 RETURNS TRIGGER AS $$
 BEGIN
+    -- Update Profiles table (Authoritative source)
+    UPDATE public.profiles
+    SET total_points = total_points + NEW.amount
+    WHERE id = NEW.user_id;
+
+    -- Update Leaderboard table
     INSERT INTO public.leaderboard (user_id, total_points, last_updated)
     VALUES (NEW.user_id, NEW.amount, NEW.timestamp)
     ON CONFLICT (user_id) 
@@ -65,7 +73,7 @@ $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS trigger_update_leaderboard ON public.user_points;
 CREATE TRIGGER trigger_update_leaderboard
 AFTER INSERT ON public.user_points
-FOR EACH ROW EXECUTE FUNCTION update_leaderboard_on_points();
+FOR EACH ROW EXECUTE FUNCTION update_points_aggregation();
 
 -- Update High Score on Test History Insertion
 CREATE OR REPLACE FUNCTION update_high_score()
