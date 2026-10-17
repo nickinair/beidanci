@@ -178,6 +178,13 @@ button:focus-visible, a:focus-visible, label:focus-within { outline: 3px solid v
           </div>
         </div>
         <div class="opt">
+          <span>几个人玩</span>
+          <div class="seg two">
+            <label><input type="radio" name="players" id="players1" value="1" checked>1 人<small>方向键 + 空格</small></label>
+            <label><input type="radio" name="players" id="players2" value="2">2 人一起打<small>2P 用 W A S D + 左 Shift</small></label>
+          </div>
+        </div>
+        <div class="opt">
           <span>语音播报</span>
           <div class="seg">
             <label><input type="radio" name="voice" id="voiceEn" value="en" checked>英文<small>B · bear</small></label>
@@ -187,7 +194,8 @@ button:focus-visible, a:focus-visible, label:focus-within { outline: 3px solid v
         <label class="toggle"><input type="checkbox" id="optWords" checked>打中后联想单词（A → apple 🍎）</label>
         <button class="btn" id="btnStart" type="button">开始游戏</button>
         <div class="help">
-          键盘：<kbd>↑↓←→</kbd> 移动，<kbd>空格</kbd> 发射散弹，<kbd>Esc</kbd> 暂停<br>
+          1P（黑色宝马）：<kbd>↑↓←→</kbd> 移动，<kbd>空格</kbd> 发射散弹，<kbd>Esc</kbd> 暂停<br>
+          2P（白色宝马）：<kbd>W A S D</kbd> 移动，<kbd>左 Shift</kbd> 发射散弹<br>
           按 <kbd>A</kbd>–<kbd>Z</kbd> 或 <kbd>0</kbd>–<kbd>9</kbd>：马上冒出一辆这个字母的小车，一直放到满屏为止<br>
           手机：左下角方向盘移动，右下角按住开火<br>
           小提示：连续打爆 3 辆以上有彩蛋哦 🥚
@@ -216,6 +224,7 @@ button:focus-visible, a:focus-visible, label:focus-within { outline: 3px solid v
           <div><b id="overLevel">1</b><span>到达关卡</span></div>
           <div><b id="overBest">0</b><span>最高分</span></div>
         </div>
+        <p id="overVs" hidden></p>
         <div class="opt">
           <span id="learnedTitle">这局打到的字母</span>
           <div class="learned" id="learned"></div>
@@ -345,7 +354,7 @@ const REWARDS = [
 const POWER_ICONS = { triple: '🔱', shield: '🛡️', freeze: '❄️', speed: '🚀', power: '💎', double: '✨' };
 
 // ---------- settings ----------
-const settings = { pool: 'upper', mode: 'baby', voice: 'en', words: true };
+const settings = { pool: 'upper', mode: 'baby', voice: 'en', words: true, players: 1 };
 const store = {
   get(k, d) { try { const v = localStorage.getItem('letterTank.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem('letterTank.' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
@@ -487,7 +496,7 @@ let S = null;
 
 function makeState() {
   return {
-    level: 1, score: 0, lives: 3, learned: {}, combo: 0, lastKill: -99, time: 0,
+    level: 1, score: 0, learned: {}, combo: 0, lastKill: -99, time: 0, players: [],
     running: false, paused: false, over: false, recent: [],
     pw: { triple: 0, shield: 0, freeze: 0, speed: 0, power: 0, double: 0 },
     shake: 0, rainbow: 0, flash: 0, banner: null, fx: [], speakQueue: [], cheers: [], lastKillPos: null,
@@ -502,7 +511,16 @@ function loadLevel(n) {
     t: ch === 'B' ? BRICK : ch === 'S' ? STEEL : ch === 'W' ? WATER : ch === 'T' ? TREE : EMPTY,
     hp: ch === 'B' ? 2 : 0,
   })));
-  S.player = { x: 6.5 * T, y: 12.5 * T, h: HALF, dir: 0, cool: 0, inv: 1.5, tread: 0, isPlayer: true };
+  // 1P starts in the middle; with two players 1P goes right and 2P (left-hand keys) goes left.
+  // Anyone knocked out comes back with one life on the next level.
+  const starts = settings.players === 2 ? [8.5, 4.5] : [6.5];
+  starts.forEach((cx, i) => {
+    const old = S.players[i];
+    S.players[i] = {
+      id: i, x: cx * T, y: 12.5 * T, h: HALF, dir: 0, cool: 0, inv: 1.5, tread: 0, isPlayer: true,
+      lives: old ? Math.max(old.lives, 1) : 3, kills: old ? old.kills : 0, out: false,
+    };
+  });
   S.enemies = []; S.bullets = []; S.particles = []; S.floaters = []; S.eggs = []; S.fx = [];
   S.total = 10 + (n - 1) * 2;
   S.spawned = 0; S.killed = 0; S.spawnTimer = 1.0;
@@ -529,6 +547,14 @@ function attractScene() {
   S.enemies.forEach((e) => { e.spawn = 0; });
 }
 
+// ---------- players ----------
+function activePlayers() { return S.players.filter((p) => !p.out); }
+function nearestPlayer(x, y) {
+  let best = null, bd = 1e9;
+  for (const p of activePlayers()) { const d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = p; } }
+  return best;
+}
+
 // ---------- collision helpers ----------
 function solidAt(x, y, h) {
   if (x - h < 0 || y - h < 0 || x + h > W || y + h > H) return true;
@@ -541,7 +567,7 @@ function solidAt(x, y, h) {
   return false;
 }
 function entAt(x, y, h, self) {
-  const list = [S.player, ...S.enemies];
+  const list = [...activePlayers(), ...S.enemies];
   for (const o of list) {
     if (o === self || o.dead) continue;
     if (Math.abs(x - o.x) < h + o.h && Math.abs(y - o.y) < h + o.h) return o;
@@ -575,21 +601,29 @@ function moveEnt(e, dist) {
 }
 
 // ---------- input ----------
-const KEYMAP = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 };
-const held = [];
-let keyFire = false, touchFire = false, touchDir = -1;
+const KEYMAP = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 };   // 1P
+const KEYMAP2 = { KeyW: 0, KeyD: 1, KeyS: 2, KeyA: 3 };                       // 2P (two-player mode only)
+const pads = [{ held: [], fire: false }, { held: [], fire: false }];
+let touchFire = false, touchDir = -1;
 const input = {
-  dir() { return touchDir >= 0 ? touchDir : held.length ? held[held.length - 1] : -1; },
-  fire() { return keyFire || touchFire; },
+  dir(i) { if (i === 0 && touchDir >= 0) return touchDir; const h = pads[i].held; return h.length ? h[h.length - 1] : -1; },
+  fire(i) { return pads[i].fire || (i === 0 && touchFire); },
 };
+function press(i, d) { if (!pads[i].held.includes(d)) pads[i].held.push(d); }
+function lift(i, d) { const k = pads[i].held.indexOf(d); if (k >= 0) pads[i].held.splice(k, 1); }
 window.addEventListener('keydown', (e) => {
   const inGame = S && S.running && !S.paused && $('ovStart').hidden && $('ovOver').hidden;
+  const two = settings.players === 2;
   if (e.code in KEYMAP) {
     if (inGame) e.preventDefault();
-    const d = KEYMAP[e.code];
-    if (!held.includes(d)) held.push(d);
+    press(0, KEYMAP[e.code]);
+  } else if (two && e.code in KEYMAP2) {
+    if (inGame) e.preventDefault();
+    press(1, KEYMAP2[e.code]);
   } else if (e.code === 'Space') {
-    if (inGame) { e.preventDefault(); keyFire = true; }
+    if (inGame) { e.preventDefault(); pads[0].fire = true; }
+  } else if (two && e.code === 'ShiftLeft') {
+    if (inGame) { e.preventDefault(); pads[1].fire = true; }
   } else if (e.code === 'Escape') {
     if (S && S.running && !S.over) togglePause();
   } else if (inGame && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && /^(Key[A-Z]|Digit[0-9]|Numpad[0-9])$/.test(e.code)) {
@@ -598,10 +632,12 @@ window.addEventListener('keydown', (e) => {
   }
 });
 window.addEventListener('keyup', (e) => {
-  if (e.code in KEYMAP) { const i = held.indexOf(KEYMAP[e.code]); if (i >= 0) held.splice(i, 1); }
-  if (e.code === 'Space') keyFire = false;
+  if (e.code in KEYMAP) lift(0, KEYMAP[e.code]);
+  if (e.code in KEYMAP2) lift(1, KEYMAP2[e.code]);
+  if (e.code === 'Space') pads[0].fire = false;
+  if (e.code === 'ShiftLeft') pads[1].fire = false;
 });
-function releaseAll() { held.length = 0; keyFire = false; touchFire = false; setTouchDir(-1); $('fire').classList.remove('on'); }
+function releaseAll() { pads.forEach((pd) => { pd.held.length = 0; pd.fire = false; }); touchFire = false; setTouchDir(-1); $('fire').classList.remove('on'); }
 window.addEventListener('blur', () => { releaseAll(); if (S && S.running && !S.paused && !S.over) togglePause(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { releaseAll(); if (S && S.running && !S.paused && !S.over) togglePause(); } });
 
@@ -671,13 +707,13 @@ function updateSpawn(dt) {
 function spawnByKey(key) {
   if (S.clearing > 0) return;
   const ch = /[A-Z]/.test(key) ? (settings.pool === 'lower' ? key.toLowerCase() : key) : key;
-  const p = S.player;
+  const ps = activePlayers();
   const spots = [];
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     const t = S.grid[r][c].t;
     if (t !== EMPTY && t !== TREE) continue;
     const x = (c + 0.5) * T, y = (r + 0.5) * T;
-    if (Math.hypot(x - p.x, y - p.y) < T * 2.2) continue;
+    if (ps.some((p) => Math.hypot(x - p.x, y - p.y) < T * 2.2)) continue;
     if (entAt(x, y, HALF + 3, null)) continue;
     spots.push([x, y]);
   }
@@ -698,11 +734,10 @@ function spawnByKey(key) {
 }
 
 // ---------- player ----------
-function updatePlayer(dt) {
-  const p = S.player;
+function updatePlayer(p, dt) {
   p.cool -= dt;
   if (p.inv > 0) p.inv -= dt;
-  const d = input.dir();
+  const d = input.dir(p.id);
   if (d >= 0) {
     if (d !== p.dir) {
       if (d % 2 !== p.dir % 2) {
@@ -720,11 +755,10 @@ function updatePlayer(dt) {
     const dist = (S.pw.speed > 0 ? 180 : 125) * dt;
     if (moveEnt(p, dist)) p.tread += dist;
   }
-  if (input.fire() && p.cool <= 0) playerShoot();
+  if (input.fire(p.id) && p.cool <= 0) playerShoot(p);
 }
 // Shotgun: a fan of piercing pellets (the triple-shot egg widens it to 11)
-function playerShoot() {
-  const p = S.player;
+function playerShoot(p) {
   const wide = S.pw.triple > 0;
   const n = wide ? 11 : 7, spread = wide ? 1.0 : 0.62;
   p.cool = 0.34;
@@ -733,7 +767,7 @@ function playerShoot() {
   for (let i = 0; i < n; i++) {
     const a = base + (i / (n - 1) - 0.5) * spread + (Math.random() - 0.5) * 0.06;
     const sp = 420 + Math.random() * 90;
-    S.bullets.push({ x: mx, y: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, owner: 'p', power: S.pw.power > 0, pierce: 2, hits: new Set(), life: 1.3 });
+    S.bullets.push({ x: mx, y: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, owner: 'p', by: p.id, power: S.pw.power > 0, pierce: 2, hits: new Set(), life: 1.3 });
   }
   S.particles.push({ k: 'flash', x: mx, y: my, life: 0.1, max: 0.1, s: 24 });
   for (let i = 0; i < 10; i++) {
@@ -743,21 +777,24 @@ function playerShoot() {
   S.shake = Math.max(S.shake, 3);
   SFX.shotgun();
 }
-function hurtPlayer() {
-  const p = S.player;
-  if (settings.mode !== 'hard' || p.inv > 0 || S.pw.shield > 0 || S.over || S.clearing > 0) return;
-  S.lives--;
+function hurtPlayer(p) {
+  if (settings.mode !== 'hard' || p.out || p.inv > 0 || S.pw.shield > 0 || S.over || S.clearing > 0) return;
+  p.lives--;
   p.inv = 2.2;
   S.combo = 0;
   S.shake = 10;
   SFX.hurt();
   burst(p.x, p.y, ['#ffc93c', '#fff', '#ff6b6b'], 18, 180);
-  if (S.lives <= 0) gameOver();
+  if (p.lives > 0) return;
+  p.out = true;
+  explode(p.x, p.y, '#ffc93c', 3);
+  if (!activePlayers().length) gameOver();
+  else { showBanner(`${p.id + 1}P 出局`, '队友加油！过了这关就能复活', 2); say('Player ' + (p.id + 1) + ' out!', 'en', 1); }
 }
 
 // ---------- enemies ----------
 function chooseDir(e, soft) {
-  const p = S.player;
+  const p = nearestPlayer(e.x, e.y) || { x: W / 2, y: H };
   const opts = [];
   for (let d = 0; d < 4; d++) {
     if (solidAt(e.x + DX[d] * 4, e.y + DY[d] * 4, e.h)) continue;
@@ -780,7 +817,6 @@ function chooseDir(e, soft) {
   e.turn = 1.2 + Math.random() * 2.6;
 }
 function updateEnemies(dt) {
-  const p = S.player;
   for (const e of S.enemies) {
     if (e.dead) continue;
     e.bob += dt;
@@ -804,7 +840,7 @@ function updateEnemies(dt) {
           S.bullets.push({ x: e.x + DX[e.dir] * 20, y: e.y + DY[e.dir] * 20, vx: DX[e.dir] * 210, vy: DY[e.dir] * 210, owner: 'e', from: e, power: false, life: 9 });
         }
       }
-      if (Math.abs(e.x - p.x) < e.h + p.h + 3 && Math.abs(e.y - p.y) < e.h + p.h + 3) hurtPlayer();
+      for (const p of activePlayers()) if (Math.abs(e.x - p.x) < e.h + p.h + 3 && Math.abs(e.y - p.y) < e.h + p.h + 3) hurtPlayer(p);
     }
   }
 }
@@ -846,16 +882,17 @@ function bulletEnt(b) {
       if (e.dead || e.spawn > 0 || b.hits.has(e)) continue;
       if (Math.abs(b.x - e.x) < e.h + 3 && Math.abs(b.y - e.y) < e.h + 3) {
         b.hits.add(e);
-        killEnemy(e, false);
+        killEnemy(e, false, b.by);
         if (--b.pierce <= 0) return true;
       }
     }
   } else {
-    const p = S.player;
-    if (Math.abs(b.x - p.x) < p.h + 2 && Math.abs(b.y - p.y) < p.h + 2) {
-      if (S.pw.shield > 0) burst(b.x, b.y, ['#4dabf7', '#fff'], 8, 100);
-      hurtPlayer();
-      return true;
+    for (const p of activePlayers()) {
+      if (Math.abs(b.x - p.x) < p.h + 2 && Math.abs(b.y - p.y) < p.h + 2) {
+        if (S.pw.shield > 0) burst(b.x, b.y, ['#4dabf7', '#fff'], 8, 100);
+        hurtPlayer(p);
+        return true;
+      }
     }
   }
   return false;
@@ -883,9 +920,10 @@ function updateBullets(dt) {
 }
 
 // ---------- kills, combos, easter eggs ----------
-function killEnemy(e, viaBomb) {
+function killEnemy(e, viaBomb, by) {
   if (e.dead) return;
   e.dead = true;
+  if (by !== undefined && S.players[by]) S.players[by].kills++;
   if (!e.keyed) S.killed++;
   if (!viaBomb) {
     S.combo = S.time - S.lastKill <= COMBO_WINDOW ? S.combo + 1 : 1;
@@ -963,18 +1001,18 @@ function dropEgg(x, y) {
   S.eggs.push({ x, y, t: 0, life: 14 });
 }
 function updateEggs(dt) {
-  const p = S.player;
   for (const g of S.eggs) {
     g.t += dt; g.life -= dt;
-    if (Math.hypot(g.x - p.x, g.y - p.y) < 30) { g.dead = true; hatch(g); }
+    const p = activePlayers().find((q) => Math.hypot(g.x - q.x, g.y - q.y) < 30);
+    if (p) { g.dead = true; hatch(g, p); }
     else if (g.life <= 0) g.dead = true;
   }
   S.eggs = S.eggs.filter((g) => !g.dead);
 }
-function hatch(g) {
-  const pool = REWARDS.filter((r) => !r.hard || settings.mode === 'hard').filter((r) => r.id !== 'life' || S.lives < 5);
+function hatch(g, p) {
+  const pool = REWARDS.filter((r) => !r.hard || settings.mode === 'hard').filter((r) => r.id !== 'life' || p.lives < 5);
   const r = pool[Math.floor(Math.random() * pool.length)];
-  if (r.id === 'life') S.lives++;
+  if (r.id === 'life') p.lives++;
   else S.pw[r.id] = Math.max(S.pw[r.id], r.dur);
   for (let i = 0; i < 14; i++) {
     const a = Math.random() * Math.PI * 2, v = 60 + Math.random() * 120;
@@ -1078,7 +1116,7 @@ function update(dt) {
   S.time += dt;
   for (const k in S.pw) if (S.pw[k] > 0) S.pw[k] = Math.max(0, S.pw[k] - dt);
   if (!S.over) {
-    updatePlayer(dt);
+    for (const p of activePlayers()) updatePlayer(p, dt);
     if (S.clearing <= 0) updateSpawn(dt);
   }
   updateEnemies(dt);
@@ -1189,9 +1227,13 @@ function drawTiles(trees) {
     else if (g.t === WATER) drawWater(x, y, S.time + performance.now() / 1000);
   }
 }
-function drawPlayer() {
-  const p = S.player;
-  if (S.over) return;
+const CAR_STYLE = [
+  { side: '#3a3f4d', mid: '#0c0e13', rim: 'rgba(220,228,255,0.45)', roof: '#16181f', mirror: '#14161c' },
+  { side: '#c9d0dc', mid: '#ffffff', rim: 'rgba(40,50,80,0.55)', roof: '#e9edf3', mirror: '#d5dbe5' },
+];
+function drawPlayer(p) {
+  if (p.out) return;
+  const st = CAR_STYLE[p.id];
   if (p.inv > 0 && Math.floor(performance.now() / 80) % 2) return;
   ctx.save();
   ctx.translate(p.x, p.y);
@@ -1205,14 +1247,14 @@ function drawPlayer() {
   ctx.fillStyle = '#050608';
   for (const [wx, wy] of [[-17, -15], [12, -15], [-17, 7], [12, 7]]) { rr(wx, wy, 5, 10, 2); ctx.fill(); }
   const body = ctx.createLinearGradient(-14, 0, 14, 0);
-  body.addColorStop(0, '#3a3f4d'); body.addColorStop(0.5, '#0c0e13'); body.addColorStop(1, '#3a3f4d');
+  body.addColorStop(0, st.side); body.addColorStop(0.5, st.mid); body.addColorStop(1, st.side);
   ctx.fillStyle = body; rr(-14, -21, 28, 41, 9); ctx.fill();
-  ctx.strokeStyle = S.pw.power > 0 ? '#66d9e8' : 'rgba(220,228,255,0.45)'; ctx.lineWidth = S.pw.power > 0 ? 2 : 1.2; ctx.stroke();
-  ctx.fillStyle = '#14161c'; rr(-17, -6, 4, 4, 1.5); ctx.fill(); rr(13, -6, 4, 4, 1.5); ctx.fill();
+  ctx.strokeStyle = S.pw.power > 0 ? '#66d9e8' : st.rim; ctx.lineWidth = S.pw.power > 0 ? 2 : 1.2; ctx.stroke();
+  ctx.fillStyle = st.mirror; rr(-17, -6, 4, 4, 1.5); ctx.fill(); rr(13, -6, 4, 4, 1.5); ctx.fill();
   ctx.fillStyle = '#34507a'; rr(-11, -8, 22, 7, 3); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,0.32)';
   ctx.beginPath(); ctx.moveTo(-8, -7); ctx.lineTo(-3, -7); ctx.lineTo(-6, -2); ctx.lineTo(-10, -2); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#16181f'; rr(-10, -1, 20, 12, 3); ctx.fill();
+  ctx.fillStyle = st.roof; rr(-10, -1, 20, 12, 3); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,0.10)'; rr(-8, 0, 6, 10, 2); ctx.fill();
   ctx.fillStyle = '#2b4263'; rr(-10, 12, 20, 4, 2); ctx.fill();
   // roundel on the bonnet: blue and white quarters in a black ring
@@ -1235,20 +1277,24 @@ function drawPlayer() {
   ctx.restore();
   drawPlate(p);
 }
-// Small upright licence plate at the car's rear (Chongqing new-energy green plate)
-const PLATE = '渝A·BH5637';
+// Small upright plate at the car's rear: 1P carries the Chongqing new-energy green plate, 2P a blue "2P" tag
+const PLATES = [
+  { text: '渝A·BH5637', top: '#f4fff6', bottom: '#5fd08a', ink: '#0b0c10' },
+  { text: '2P', top: '#4d8eff', bottom: '#1c4fb8', ink: '#ffffff' },
+];
 function drawPlate(p) {
+  const pl = PLATES[p.id];
   ctx.font = '700 8.5px "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif';
-  const w = Math.ceil(ctx.measureText(PLATE).width) + 7, h = 12;
+  const w = Math.ceil(ctx.measureText(pl.text).width) + 9, h = 12;
   const back = p.dir % 2 === 0 ? 27 : 20 + w / 2;
   const cx = Math.max(w / 2 + 1, Math.min(W - w / 2 - 1, p.x - DX[p.dir] * back));
   const cy = Math.max(h / 2 + 1, Math.min(H - h / 2 - 1, p.y - DY[p.dir] * back));
   const g = ctx.createLinearGradient(0, cy - h / 2, 0, cy + h / 2);
-  g.addColorStop(0, '#f4fff6'); g.addColorStop(1, '#5fd08a');
+  g.addColorStop(0, pl.top); g.addColorStop(1, pl.bottom);
   ctx.fillStyle = g; rr(cx - w / 2, cy - h / 2, w, h, 2); ctx.fill();
   ctx.strokeStyle = '#1b1d24'; ctx.lineWidth = 1; ctx.stroke();
-  ctx.fillStyle = '#0b0c10'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(PLATE, cx, cy + 0.5);
+  ctx.fillStyle = pl.ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(pl.text, cx, cy + 0.5);
 }
 function drawCar(e) {
   const bounce = Math.sin(e.bob * 14) * (S.pw.freeze > 0 ? 0 : 0.8);
@@ -1438,7 +1484,7 @@ function render() {
   for (const g of S.eggs) drawEgg(g);
   drawBullets();
   for (const e of S.enemies) drawCar(e);
-  drawPlayer();
+  for (const p of S.players) drawPlayer(p);
   drawParticles(false);
   drawTiles(true);
   drawParticles(true);
@@ -1463,7 +1509,10 @@ function updateHud() {
   setText('hudScore', String(S.score));
   const hard = settings.mode === 'hard';
   $('hudLivesWrap').hidden = !hard;
-  if (hard) setText('hudLives', '♥'.repeat(Math.max(0, S.lives)) || '♡');
+  if (hard) {
+    const hearts = (p) => (p.out ? '出局' : '♥'.repeat(Math.max(0, p.lives)));
+    setText('hudLives', S.players.length > 1 ? S.players.map((p) => `${p.id + 1}P ${hearts(p)}`).join('  ') : hearts(S.players[0]) || '♡');
+  }
   const showCombo = S.combo >= 2;
   $('hudCombo').hidden = !showCombo;
   if (showCombo) {
@@ -1483,11 +1532,12 @@ function readSettings() {
   settings.mode = document.querySelector('input[name="mode"]:checked').value;
   settings.voice = document.querySelector('input[name="voice"]:checked').value;
   settings.words = $('optWords').checked;
+  settings.players = +document.querySelector('input[name="players"]:checked').value;
   store.set('settings', settings);
 }
 function applySettingsToForm() {
   const set = (name, v) => { const el = document.querySelector(`input[name="${name}"][value="${v}"]`); if (el) el.checked = true; };
-  set('pool', settings.pool); set('mode', settings.mode); set('voice', settings.voice);
+  set('pool', settings.pool); set('mode', settings.mode); set('voice', settings.voice); set('players', settings.players);
   $('optWords').checked = !!settings.words;
 }
 function startGame() {
@@ -1517,6 +1567,13 @@ function showSummary(title) {
   $('overTitle').textContent = title;
   $('overScore').textContent = S.score;
   $('overLevel').textContent = S.level;
+  const vs = $('overVs');
+  vs.hidden = S.players.length < 2;
+  if (S.players.length > 1) {
+    const [a, b] = S.players;
+    const crown = (x, y) => (x.kills > y.kills ? ' 🏆' : '');
+    vs.textContent = `1P 黑色宝马打爆 ${a.kills} 辆${crown(a, b)} · 2P 白色宝马打爆 ${b.kills} 辆${crown(b, a)}`;
+  }
   $('overBest').textContent = best;
   const keys = Object.keys(S.learned).sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
   $('learnedTitle').textContent = keys.length ? `这局打到了 ${keys.length} 个不同的${settings.pool === 'digit' ? '数字' : '字符'}` : '这局还没打到小车，再试一次吧';
