@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
-import { Trophy, Play, History, Info, ChevronLeft, Briefcase, Sparkles, CalendarCheck, Lock, Gift, ChevronRight } from 'lucide-react';
+import { Trophy, Play, History, Info, ChevronLeft, Briefcase, Sparkles, CalendarCheck, Lock, Gift, ChevronRight, Gamepad2 } from 'lucide-react';
 
 interface HomeProps {
   user: UserProfile;
@@ -246,6 +246,11 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, 
           我的错题本
         </button>
       </div>
+
+      <a href="/games/letter-tank.html" className="mt-3 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500/20 to-emerald-500/20 border border-sky-500/20 py-3 rounded-xl text-sky-300 text-sm font-medium hover:from-sky-500/30 hover:to-emerald-500/30 transition-all">
+        <Gamepad2 size={16} />
+        字母坦克大战：打小车，学字母
+      </a>
 
       <button onClick={onViewRules} className="mt-3 mb-2 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/20 py-3 rounded-xl text-amber-400 text-sm font-medium hover:from-amber-500/30 hover:to-orange-500/30 transition-all">
         <Info size={16} />
