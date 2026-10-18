@@ -155,12 +155,12 @@ button:focus-visible, a:focus-visible, label:focus-within { outline: 3px solid v
   </header>
 
   <main id="stage">
-    <canvas id="cv" width="624" height="624" aria-label="游戏画面"></canvas>
+    <canvas id="cv" width="1008" height="624" aria-label="游戏画面"></canvas>
 
     <div class="overlay" id="ovStart">
       <div class="card">
         <h1>字母坦克大战<small>LETTER TANKS</small></h1>
-        <p>开着黑色宝马（渝A·BH5637）去打带字母的小车，打中就会爆炸，还会大声念出字母！</p>
+        <p>开着黑色宝马（渝A·BH5637）去打带字母的小车，打中就会爆炸，还会大声念出字母！一共 12 关，每关都是一张新地图。</p>
         <div class="opt">
           <span>打什么</span>
           <div class="seg two">
@@ -250,74 +250,195 @@ button:focus-visible, a:focus-visible, label:focus-within { outline: 3px solid v
 'use strict';
 
 // ---------- constants ----------
-const COLS = 13, ROWS = 13, T = 48, W = COLS * T, H = ROWS * T;
+const COLS = 21, ROWS = 13, T = 48, W = COLS * T, H = ROWS * T;
 const EMPTY = 0, BRICK = 1, STEEL = 2, WATER = 3, TREE = 4;
 const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
 const HALF = 17;                 // tank / car half size (34px in a 48px tile)
 const COMBO_WINDOW = 4;          // seconds between kills to keep the combo going
-const SPAWN_COLS = [0, 6, 12];
+const SPAWN_COLS = [0, 10, 20];
+const LAST_LEVEL = 12;          // one hand-made map per level, then the victory screen
 
 /*MAPS*/
 const MAPS = [
-  { name: '砖墙迷宫', rows: [
-    '.............',
-    '.B.B.B.B.B.B.',
-    '.B.B.B.B.B.B.',
-    '.B.B.BSB.B.B.',
-    '.B.B.....B.B.',
-    '....B...B....',
-    'S.BB.TTT.BB.S',
-    '....B...B....',
-    '.B.B.BBB.B.B.',
-    '.B.B.B.B.B.B.',
-    '.B.B.....B.B.',
-    '.B...WWW...B.',
-    '.............',
+  { name: '新手草原', ground: '#1f2c2a', rows: [
+    '.....................',
+    '.....................',
+    '..TT.............TT..',
+    '..TT.............TT..',
+    '.......BBB.BBB.......',
+    '.....................',
+    '.....................',
+    '..........B..........',
+    '...TT.....B.....TT...',
+    '...TT.....B.....TT...',
+    '......WW.....WW......',
+    '.....................',
+    '.....................',
   ]},
-  { name: '河流森林', rows: [
-    '.............',
-    '.TT.BB.BB.TT.',
-    '.TT.B...B.TT.',
-    '....B.S.B....',
-    'WW.........WW',
-    'WW.BB.B.BB.WW',
-    '......S......',
-    'WW.BB.B.BB.WW',
-    'WW.........WW',
-    '....B.S.B....',
-    '.TT.B...B.TT.',
-    '.TT.BB.BB.TT.',
-    '.............',
+  { name: '砖墙迷宫', ground: '#1f2742', rows: [
+    '.....................',
+    '.B.B.B.B.B.B.B.B.B.B.',
+    '.B.B.B.B.B.B.B.B.B.B.',
+    '.B.B.B.B.B.B.B.B.B.B.',
+    '.B.B.B.B.B.B.B.B.B.B.',
+    '........S.B.S........',
+    '...BB.BBS.B.SBB.BB...',
+    '.B.B.B.B.B.B.B.B.B.B.',
+    '.B.B.B.B.B.B.B.B.B.B.',
+    '.B.B.B.B.B.B.B.B.B.B.',
+    '.B.B.B.B.B.B.B.B.B.B.',
+    '.....................',
+    '.....................',
   ]},
-  { name: 'ABC 字母城', rows: [
-    '.............',
-    '.T.........T.',
-    '..B..BB...BB.',
-    '.B.B.B.B.B...',
-    '.BBB.BB..B...',
-    '.B.B.B.B.B...',
-    '.B.B.BB...BB.',
-    '..B..BB..BB..',
-    '.BB....B...B.',
-    '..B...B...B..',
-    '..B..B.....B.',
-    '.BBB.BBB.BB..',
-    '.............',
+  { name: '河流森林', ground: '#1c2b33', rows: [
+    '.....................',
+    '.TT....TT...TT....TT.',
+    '.TT....TT...TT....TT.',
+    '.....................',
+    '.....BBBB...BBBB.....',
+    '.....................',
+    'WWW..WWWWW.WWWWW..WWW',
+    '.....................',
+    '.....BBBB...BBBB.....',
+    '..TT....TT...TT..TT..',
+    '..TT....TT...TT..TT..',
+    '.....................',
+    '.....................',
   ]},
-  { name: '钢铁堡垒', rows: [
-    '.............',
-    '.SS.BBBBB.SS.',
-    '.............',
-    '.B.TT.S.TT.B.',
-    '.B.TT...TT.B.',
-    '.B..BB.BB..B.',
-    '...B.....B...',
-    'SS.B.WWW.B.SS',
-    '...B.....B...',
-    '.B..BB.BB..B.',
-    '.B.TT...TT.B.',
-    '.B...BBB...B.',
-    '.............',
+  { name: '小鱼湖', ground: '#1b2a3a', rows: [
+    '.....................',
+    '.TT...BBBBBBBBB...TT.',
+    '.TT...............TT.',
+    '......WWWWW.....W....',
+    '.....WWWWWWW...WW....',
+    '....WWSWWWWWW.WWW....',
+    '.....WWWWWWWWWWW.....',
+    '....WWWWWWWWW.WWW....',
+    '.....WWWWWWW...WW....',
+    '......WWWWW.....W....',
+    '.TT...............TT.',
+    '.TT...BB.....BB...TT.',
+    '.....................',
+  ]},
+  { name: '钢铁堡垒', ground: '#22263a', rows: [
+    '.....................',
+    'SS.................SS',
+    '..B...............B..',
+    '..B...SSSSBSSSS...B..',
+    '..B...S.......S...B..',
+    '......S..TTT..S......',
+    '......B..TTT..B......',
+    '......S..TTT..S......',
+    '..B...S.......S...B..',
+    '..B...SSSSBSSSS...B..',
+    '..B...............B..',
+    '....BB.........BB....',
+    '.....................',
+  ]},
+  { name: 'ABC 字母城', ground: '#26223f', rows: [
+    '.....................',
+    '.....................',
+    '..B..BB...BB.BB..BBB.',
+    '.B.B.B.B.B...B.B.B...',
+    '.BBB.BB..B...B.B.BB..',
+    '.B.B.B.B.B...B.B.B...',
+    '.B.B.BB...BB.BB..BBB.',
+    '.....................',
+    '.........SSS.........',
+    '..TTTTT..SSS..TTTTT..',
+    '.....................',
+    '.....................',
+    '.....................',
+  ]},
+  { name: '123 数字乐园', ground: '#1f2a3f', rows: [
+    '.....................',
+    '.....................',
+    '..B..BB..BB..B.B.BBB.',
+    '.BB....B...B.B.B.B...',
+    '..B...B...B..BBB.BB..',
+    '..B..B.....B...B...B.',
+    '.BBB.BBB.BB....B.BB..',
+    '.....................',
+    '.....................',
+    '.WW.....BBBBB.....WW.',
+    '.WW...............WW.',
+    '.....................',
+    '.....................',
+  ]},
+  { name: '爱心城堡', ground: '#30213a', rows: [
+    '.....................',
+    '.TT...BBB...BBB...TT.',
+    '.TT..BBBBB.BBBBB..TT.',
+    '.....BBBBSSSBBBB.....',
+    '......BBBSSSBBB......',
+    '.......BBBBBBB.......',
+    '.TT.....BBBBB.....TT.',
+    '.TT......BBB......TT.',
+    '..........B..........',
+    '.....................',
+    '..BBB...........BBB..',
+    '.....................',
+    '.....................',
+  ]},
+  { name: '笑脸星球', ground: '#1a1f3d', rows: [
+    '.....................',
+    '.T.....BBB.BBB.......',
+    '.....BB.......BB.....',
+    '....B..S.....S..B..T.',
+    'T...B..S.....S..B....',
+    '....B...........B....',
+    '.T..B..W.....W..B....',
+    '....B...WWWWW...B....',
+    '.....BB.......BB.....',
+    '.......BBB.BBB......T',
+    '..................T..',
+    '..T..................',
+    '.....................',
+  ]},
+  { name: '火箭基地', ground: '#151a33', rows: [
+    '.....................',
+    '..T.......S..........',
+    '.........SBS.T.......',
+    '.........BBB.....T...',
+    '.........BTB.........',
+    '.TBB.....BBB.....BB..',
+    '..BB....BBBBB....BB..',
+    '.......BB...BB.....T.',
+    '.......W.....W.......',
+    '...T.................',
+    '.SSSS..........TSSSS.',
+    '.....................',
+    '.....................',
+  ]},
+  { name: '彩虹桥', ground: '#1b2240', rows: [
+    '.....................',
+    'TT...BBB.....BBB...TT',
+    '.....................',
+    'WW..WWWWWW.WWWWWWWWWW',
+    '.....BBB.....BBB.....',
+    '.....................',
+    'WWWWWWWWW...WWWWW..WW',
+    '..BBB...........BBB..',
+    '.....................',
+    'WW..WWWWWW.WWWWWWWWWW',
+    '......BBB...BBB......',
+    'TT.................TT',
+    '.....................',
+  ]},
+  { name: '魔王城堡', ground: '#2a1d2f', rows: [
+    '.....................',
+    '.S.....TT...TT.....S.',
+    '.S..WWWWWW.WWWWWW..S.',
+    '....WSBBBB.BBBBSW....',
+    '....WS...SSS...SW....',
+    '........BSSSB........',
+    '....WS...SSS...SW....',
+    '....WSBBBB.BBBBSW....',
+    '....WWWWWW.WWWWWW....',
+    '.S.................S.',
+    '.S....BBB...BBB....S.',
+    '.....................',
+    '.....................',
   ]},
 ];
 /*END MAPS*/
@@ -480,12 +601,13 @@ const cv = $('cv'), ctx = cv.getContext('2d');
 const stage = $('stage');
 let pxScale = 1;
 function resize() {
-  const size = Math.max(200, Math.floor(Math.min(stage.clientWidth, stage.clientHeight)));
+  const k = Math.max(0.2, Math.min(stage.clientWidth / W, stage.clientHeight / H));
+  const cssW = Math.floor(W * k), cssH = Math.floor(H * k);
   const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  cv.style.width = size + 'px';
-  cv.style.height = size + 'px';
-  cv.width = Math.round(size * dpr);
-  cv.height = Math.round(size * dpr);
+  cv.style.width = cssW + 'px';
+  cv.style.height = cssH + 'px';
+  cv.width = Math.round(cssW * dpr);
+  cv.height = Math.round(cssH * dpr);
   pxScale = cv.width / W;
 }
 if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
@@ -504,16 +626,17 @@ function makeState() {
 }
 
 function loadLevel(n) {
-  const m = MAPS[(n - 1) % MAPS.length];
+  const m = MAPS[Math.min(n, MAPS.length) - 1];
   S.level = n;
   S.mapName = m.name;
+  S.ground = m.ground;
   S.grid = m.rows.map((r) => [...r].map((ch) => ({
     t: ch === 'B' ? BRICK : ch === 'S' ? STEEL : ch === 'W' ? WATER : ch === 'T' ? TREE : EMPTY,
     hp: ch === 'B' ? 2 : 0,
   })));
   // 1P starts in the middle; with two players 1P goes right and 2P (left-hand keys) goes left.
   // Anyone knocked out comes back with one life on the next level.
-  const starts = settings.players === 2 ? [8.5, 4.5] : [6.5];
+  const starts = settings.players === 2 ? [12.5, 8.5] : [10.5];
   starts.forEach((cx, i) => {
     const old = S.players[i];
     S.players[i] = {
@@ -524,10 +647,10 @@ function loadLevel(n) {
   S.enemies = []; S.bullets = []; S.particles = []; S.floaters = []; S.eggs = []; S.fx = [];
   S.total = 10 + (n - 1) * 2;
   S.spawned = 0; S.killed = 0; S.spawnTimer = 1.0;
-  S.maxOn = Math.min(3 + Math.floor((n - 1) / 2), 6);
-  S.carSpeed = Math.min(52 + n * 6, 110);
+  S.maxOn = Math.min(3 + Math.floor((n - 1) / 2), 7);
+  S.carSpeed = Math.min(52 + n * 5, 110);
   S.clearing = 0;
-  showBanner(`第 ${n} 关`, m.name, 2);
+  showBanner(`第 ${n} 关 / ${LAST_LEVEL}`, m.name, 2);
 }
 
 function newGame() {
@@ -541,7 +664,7 @@ function attractScene() {
   S = makeState();
   loadLevel(1);
   S.banner = null;
-  [['A', 0.5, 2], ['B', 6.5, 4.5], ['C', 12.5, 2], ['7', 4.5, 7]].forEach(([ch, cx, cy], i) => {
+  [['A', 5.5, 2.5], ['B', 10.5, 5.5], ['C', 15.5, 2.5], ['7', 14.5, 7.5]].forEach(([ch, cx, cy], i) => {
     S.enemies.push(makeCar(cx * T, cy * T, ch, CAR_COLORS[i % CAR_COLORS.length]));
   });
   S.enemies.forEach((e) => { e.spawn = 0; });
@@ -1128,8 +1251,9 @@ function update(dt) {
   flushSpeech();
 
   if (!S.over && S.clearing <= 0 && S.killed >= S.total) {
+    if (S.level >= LAST_LEVEL) { victory(); return; }
     S.clearing = 3;
-    showBanner('过关啦！', `第 ${S.level} 关完成 · 下一关更快哦`, 2.8);
+    showBanner('过关啦！', `下一关：${MAPS[S.level].name}`, 2.8);
     SFX.win();
     say('Level complete!', 'en', 1);
     celebrate(1);
@@ -1142,6 +1266,21 @@ function update(dt) {
       S.pw = keep;
     }
   }
+}
+
+function victory() {
+  S.over = true;
+  S.won = true;
+  S.combo = 0;
+  S.enemies.forEach((e) => { if (!e.dead) explode(e.x, e.y, e.color, 3); });
+  S.enemies = [];
+  showBanner('全部通关！', `${LAST_LEVEL} 关全部打完，你们太厉害了 🏆`, 4.5);
+  celebrate(3);
+  S.fx.push({ at: S.time + 1.6, run: () => celebrate(3) });
+  SFX.win();
+  hush();
+  say('Congratulations! You are the champion!', 'en', 1);
+  setTimeout(() => showSummary(`🏆 ${LAST_LEVEL} 关全部通关！`), 4200);
 }
 
 function gameOver() {
@@ -1160,7 +1299,7 @@ function rr(x, y, w, h, r) {
   ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
 }
 function drawGround() {
-  ctx.fillStyle = '#1f2742';
+  ctx.fillStyle = S.ground || '#1f2742';
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = 'rgba(169,176,214,0.09)';
   for (let r = 1; r < ROWS; r++) for (let c = 1; c < COLS; c++) ctx.fillRect(c * T - 1.5, r * T - 1.5, 3, 3);
@@ -1504,7 +1643,7 @@ function render() {
 const hudCache = {};
 function setText(id, v) { if (hudCache[id] !== v) { hudCache[id] = v; $(id).textContent = v; } }
 function updateHud() {
-  setText('hudLevel', String(S.level));
+  setText('hudLevel', `${S.level}/${LAST_LEVEL}`);
   setText('hudLeft', String(Math.max(0, S.total - S.killed)));
   setText('hudScore', String(S.score));
   const hard = settings.mode === 'hard';
@@ -1566,7 +1705,7 @@ function showSummary(title) {
   store.set(key, best);
   $('overTitle').textContent = title;
   $('overScore').textContent = S.score;
-  $('overLevel').textContent = S.level;
+  $('overLevel').textContent = `${S.level}/${LAST_LEVEL}`;
   const vs = $('overVs');
   vs.hidden = S.players.length < 2;
   if (S.players.length > 1) {
@@ -1625,7 +1764,7 @@ applyMute();
 attractScene();
 resize();
 requestAnimationFrame(frame);
-window.__letterTank = { get state() { return S; } };
+window.__letterTank = { get state() { return S; }, loadLevel: (n) => loadLevel(n) };
 })();
 </script>
 </body>
