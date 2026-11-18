@@ -136,6 +136,15 @@ button:focus-visible, a:focus-visible, label:focus-within { outline: 3px solid v
   background: var(--coral); color: #2a0d12; font-family: var(--display); font-size: 24px; box-shadow: 0 6px 0 #b8383b;
 }
 #fire.on { transform: translateY(4px); box-shadow: 0 2px 0 #b8383b; }
+.shots { display: flex; align-items: center; gap: 10px; }
+.shot-col { display: flex; flex-direction: column; gap: 8px; }
+.shot {
+  width: 52px; height: 52px; border-radius: 50%; border: 0; touch-action: none; cursor: pointer;
+  display: grid; place-items: center; font-size: 24px; line-height: 1;
+}
+.shot.ice { background: #74c0fc; box-shadow: 0 5px 0 #1c7ed6; }
+.shot.pierce { background: #66d9e8; box-shadow: 0 5px 0 #1098ad; }
+.shot.on { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,.35); }
 @media (prefers-reduced-motion: reduce) { .btn, #fire { transition: none; } }
 </style>
 </head>
@@ -195,9 +204,11 @@ button:focus-visible, a:focus-visible, label:focus-within { outline: 3px solid v
         <button class="btn" id="btnStart" type="button">开始游戏</button>
         <div class="help">
           1P（黑色宝马）：<kbd>↑↓←→</kbd> 移动，<kbd>空格</kbd> 发射散弹，<kbd>Esc</kbd> 暂停<br>
+          1P 特殊炮弹：<kbd>右 Shift</kbd> ❄️ 冰冻炮弹（冻住一片小车，再打就碎），<kbd>回车</kbd> 💎 穿甲弹（打穿钢板和砖墙、砍倒树木，一路上的小车全打爆）<br>
           2P（白色宝马）：<kbd>W A S D</kbd> 移动，<kbd>左 Shift</kbd> 发射散弹<br>
           按 <kbd>A</kbd>–<kbd>Z</kbd> 或 <kbd>0</kbd>–<kbd>9</kbd>：马上冒出一辆这个字母的小车，一直放到满屏为止<br>
-          手机：左下角方向盘移动，右下角按住开火<br>
+          手机：左下角方向盘移动，右下角按住开火，❄️ / 💎 发特殊炮弹<br>
+          开到河面上会自动变成气垫船 🛥️，上岸就变回小汽车（字母小车过不了河哦）<br>
           小提示：连续打爆 3 辆以上有彩蛋哦 🥚
         </div>
       </div>
@@ -241,7 +252,13 @@ button:focus-visible, a:focus-visible, label:focus-within { outline: 3px solid v
     <div id="dpad" aria-label="方向盘">
       <span class="arr a0">▲</span><span class="arr a1">▶</span><span class="arr a2">▼</span><span class="arr a3">◀</span>
     </div>
-    <button id="fire" type="button">开火</button>
+    <div class="shots">
+      <div class="shot-col">
+        <button id="fireIce" class="shot ice" type="button" aria-label="冰冻炮弹">❄️</button>
+        <button id="firePierce" class="shot pierce" type="button" aria-label="穿甲弹">💎</button>
+      </div>
+      <button id="fire" type="button">开火</button>
+    </div>
   </div>
 </div>
 
@@ -468,7 +485,7 @@ const REWARDS = [
   { id: 'shield', name: '护盾', en: 'Shield!', icon: '🛡️', dur: 10, hard: true },
   { id: 'freeze', name: '时间冻结', en: 'Freeze!', icon: '❄️', dur: 5 },
   { id: 'speed', name: '极速', en: 'Turbo!', icon: '🚀', dur: 10 },
-  { id: 'power', name: '穿甲弹', en: 'Power shot!', icon: '💎', dur: 10 },
+  { id: 'power', name: '穿甲散弹', en: 'Power shot!', icon: '💎', dur: 10 },
   { id: 'double', name: '双倍积分', en: 'Double score!', icon: '✨', dur: 10 },
   { id: 'life', name: '+1 生命', en: 'Extra life!', icon: '❤️', hard: true },
 ];
@@ -557,6 +574,16 @@ const SFX = {
   firework() { noise(0.4, { vol: 0.22, f: 4000, f2: 500, type: 'highpass' }); tone(220, 0.25, { type: 'sine', vol: 0.15, to: 60 }); },
   win() { [523, 659, 784, 659, 784, 1047].forEach((f, i) => tone(f, 0.2, { type: 'triangle', vol: 0.18, delay: i * 0.12 })); },
   over() { [523, 440, 349, 262].forEach((f, i) => tone(f, 0.32, { type: 'triangle', vol: 0.18, delay: i * 0.22 })); },
+  iceShot() { tone(1400, 0.18, { type: 'triangle', vol: 0.12, to: 700 }); noise(0.2, { vol: 0.2, f: 5000, type: 'highpass' }); },
+  ice() {
+    [2093, 2637, 3136].forEach((f, i) => tone(f, 0.25, { type: 'triangle', vol: 0.1, delay: i * 0.05 }));
+    noise(0.45, { vol: 0.3, f: 6000, f2: 1500, type: 'highpass' });
+  },
+  shatter() { noise(0.25, { vol: 0.35, f: 7000, f2: 2000, type: 'highpass' }); tone(2600, 0.12, { type: 'triangle', vol: 0.1, to: 1800 }); },
+  pierceShot() { noise(0.2, { vol: 0.35, f: 2500, f2: 400 }); tone(1800, 0.14, { type: 'sawtooth', vol: 0.08, to: 500 }); },
+  hoverOn() { noise(0.4, { vol: 0.3, f: 300, f2: 2200 }); tone(180, 0.35, { type: 'sawtooth', vol: 0.06, to: 420 }); },
+  hoverOff() { noise(0.25, { vol: 0.25, f: 1500, f2: 300 }); tone(400, 0.25, { type: 'sawtooth', vol: 0.05, to: 160 }); },
+  bore() { tone(1300, 0.1, { type: 'triangle', vol: 0.12, to: 700 }); noise(0.18, { vol: 0.35, f: 1800, f2: 300, type: 'bandpass', q: 1.2 }); },
 };
 
 // ---------- speech ----------
@@ -641,7 +668,7 @@ function loadLevel(n) {
   starts.forEach((cx, i) => {
     const old = S.players[i];
     S.players[i] = {
-      id: i, x: cx * T, y: 12.5 * T, h: HALF, dir: 0, cool: 0, inv: 1.5, tread: 0, isPlayer: true,
+      id: i, x: cx * T, y: 12.5 * T, h: HALF, dir: 0, cool: 0, coolIce: 0, coolPierce: 0, onWater: false, hoverK: 0, inv: 1.5, tread: 0, isPlayer: true,
       lives: old ? Math.max(old.lives, 1) : 3, kills: old ? old.kills : 0, out: false,
     };
   });
@@ -680,13 +707,22 @@ function nearestPlayer(x, y) {
 }
 
 // ---------- collision helpers ----------
-function solidAt(x, y, h) {
+// swim = player cars, which turn into a hovercraft on water instead of being blocked by it
+function solidAt(x, y, h, swim) {
   if (x - h < 0 || y - h < 0 || x + h > W || y + h > H) return true;
   const c0 = Math.floor((x - h) / T), c1 = Math.floor((x + h - 0.001) / T);
   const r0 = Math.floor((y - h) / T), r1 = Math.floor((y + h - 0.001) / T);
   for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
     const t = S.grid[r][c].t;
-    if (t === BRICK || t === STEEL || t === WATER) return true;
+    if (t === BRICK || t === STEEL || (t === WATER && !swim)) return true;
+  }
+  return false;
+}
+function overWater(x, y, h) {
+  const c0 = Math.floor((x - h) / T), c1 = Math.floor((x + h - 0.001) / T);
+  const r0 = Math.floor((y - h) / T), r1 = Math.floor((y + h - 0.001) / T);
+  for (let r = Math.max(0, r0); r <= Math.min(ROWS - 1, r1); r++) {
+    for (let c = Math.max(0, c0); c <= Math.min(COLS - 1, c1); c++) if (S.grid[r][c].t === WATER) return true;
   }
   return false;
 }
@@ -702,7 +738,7 @@ function entAt(x, y, h, self) {
 function moveEnt(e, dist) {
   const h = e.h;
   const nx = e.x + DX[e.dir] * dist, ny = e.y + DY[e.dir] * dist;
-  if (!solidAt(nx, ny, h) && !entAt(nx, ny, h, e)) { e.x = nx; e.y = ny; return true; }
+  if (!solidAt(nx, ny, h, e.isPlayer) && !entAt(nx, ny, h, e)) { e.x = nx; e.y = ny; return true; }
   const vert = e.dir % 2 === 0;
   const coord = vert ? e.x : e.y;
   const c0 = Math.floor(coord / T);
@@ -714,12 +750,12 @@ function moveEnt(e, dist) {
     const lc = (L + 0.5) * T, d = Math.abs(lc - coord);
     if (d < 0.5 || d > T * 0.55) continue;
     const tx = vert ? lc : e.x + DX[e.dir] * look, ty = vert ? e.y + DY[e.dir] * look : lc;
-    if (!solidAt(tx, ty, h) && d < bd) { best = lc; bd = d; }
+    if (!solidAt(tx, ty, h, e.isPlayer) && d < bd) { best = lc; bd = d; }
   }
   if (best !== null) {
     const step = Math.sign(best - coord) * Math.min(bd, Math.max(dist, 1));
     const sx = vert ? e.x + step : e.x, sy = vert ? e.y : e.y + step;
-    if (!solidAt(sx, sy, h) && !entAt(sx, sy, h, e)) { e.x = sx; e.y = sy; return true; }
+    if (!solidAt(sx, sy, h, e.isPlayer) && !entAt(sx, sy, h, e)) { e.x = sx; e.y = sy; return true; }
   }
   return false;
 }
@@ -727,11 +763,13 @@ function moveEnt(e, dist) {
 // ---------- input ----------
 const KEYMAP = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 };   // 1P
 const KEYMAP2 = { KeyW: 0, KeyD: 1, KeyS: 2, KeyA: 3 };                       // 2P (two-player mode only)
-const pads = [{ held: [], fire: false }, { held: [], fire: false }];
-let touchFire = false, touchDir = -1;
+const pads = [{ held: [], fire: false, ice: false, pierce: false }, { held: [], fire: false, ice: false, pierce: false }];
+let touchFire = false, touchDir = -1, touchIce = false, touchPierce = false;
 const input = {
   dir(i) { if (i === 0 && touchDir >= 0) return touchDir; const h = pads[i].held; return h.length ? h[h.length - 1] : -1; },
   fire(i) { return pads[i].fire || (i === 0 && touchFire); },
+  ice(i) { return pads[i].ice || (i === 0 && touchIce); },
+  pierce(i) { return pads[i].pierce || (i === 0 && touchPierce); },
 };
 function press(i, d) { if (!pads[i].held.includes(d)) pads[i].held.push(d); }
 function lift(i, d) { const k = pads[i].held.indexOf(d); if (k >= 0) pads[i].held.splice(k, 1); }
@@ -748,6 +786,10 @@ window.addEventListener('keydown', (e) => {
     if (inGame) { e.preventDefault(); pads[0].fire = true; }
   } else if (two && e.code === 'ShiftLeft') {
     if (inGame) { e.preventDefault(); pads[1].fire = true; }
+  } else if (e.code === 'ShiftRight') {
+    if (inGame) { e.preventDefault(); pads[0].ice = true; }
+  } else if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+    if (inGame) { e.preventDefault(); pads[0].pierce = true; }
   } else if (e.code === 'Escape') {
     if (S && S.running && !S.over) togglePause();
   } else if (inGame && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && /^(Key[A-Z]|Digit[0-9]|Numpad[0-9])$/.test(e.code)) {
@@ -760,8 +802,14 @@ window.addEventListener('keyup', (e) => {
   if (e.code in KEYMAP2) lift(1, KEYMAP2[e.code]);
   if (e.code === 'Space') pads[0].fire = false;
   if (e.code === 'ShiftLeft') pads[1].fire = false;
+  if (e.code === 'ShiftRight') pads[0].ice = false;
+  if (e.code === 'Enter' || e.code === 'NumpadEnter') pads[0].pierce = false;
 });
-function releaseAll() { pads.forEach((pd) => { pd.held.length = 0; pd.fire = false; }); touchFire = false; setTouchDir(-1); $('fire').classList.remove('on'); }
+function releaseAll() {
+  pads.forEach((pd) => { pd.held.length = 0; pd.fire = false; pd.ice = false; pd.pierce = false; });
+  touchFire = touchIce = touchPierce = false; setTouchDir(-1);
+  ['fire', 'fireIce', 'firePierce'].forEach((id) => $(id).classList.remove('on'));
+}
 window.addEventListener('blur', () => { releaseAll(); if (S && S.running && !S.paused && !S.over) togglePause(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { releaseAll(); if (S && S.running && !S.paused && !S.over) togglePause(); } });
 
@@ -785,6 +833,13 @@ dpad.addEventListener('pointermove', (e) => { if (e.pointerId === dpadPtr) dpadA
 const fireBtn = $('fire');
 fireBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); initAudio(); touchFire = true; fireBtn.classList.add('on'); try { fireBtn.setPointerCapture(e.pointerId); } catch (_) {} });
 ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((t) => fireBtn.addEventListener(t, () => { touchFire = false; fireBtn.classList.remove('on'); }));
+// Special-shell buttons: hold to keep firing (each shell has its own cooldown)
+function holdButton(btn, set) {
+  btn.addEventListener('pointerdown', (e) => { e.preventDefault(); initAudio(); set(true); btn.classList.add('on'); try { btn.setPointerCapture(e.pointerId); } catch (_) {} });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((t) => btn.addEventListener(t, () => { set(false); btn.classList.remove('on'); }));
+}
+holdButton($('fireIce'), (v) => { touchIce = v; });
+holdButton($('firePierce'), (v) => { touchPierce = v; });
 document.addEventListener('contextmenu', (e) => { if (e.target.closest('.pad')) e.preventDefault(); });
 
 // ---------- spawning ----------
@@ -860,6 +915,8 @@ function spawnByKey(key) {
 // ---------- player ----------
 function updatePlayer(p, dt) {
   p.cool -= dt;
+  p.coolIce -= dt;
+  p.coolPierce -= dt;
   if (p.inv > 0) p.inv -= dt;
   const d = input.dir(p.id);
   if (d >= 0) {
@@ -871,15 +928,124 @@ function updatePlayer(p, dt) {
         const snap = Math.round(coord / (T / 2)) * (T / 2);
         if (Math.abs(snap - coord) <= 8) {
           const sx = vert ? snap : p.x, sy = vert ? p.y : snap;
-          if (!solidAt(sx, sy, p.h) && !entAt(sx, sy, p.h, p)) { p.x = sx; p.y = sy; }
+          if (!solidAt(sx, sy, p.h, true) && !entAt(sx, sy, p.h, p)) { p.x = sx; p.y = sy; }
         }
       }
       p.dir = d;
     }
     const dist = (S.pw.speed > 0 ? 180 : 125) * dt;
-    if (moveEnt(p, dist)) p.tread += dist;
+    if (moveEnt(p, dist)) { p.tread += dist; p.moving = 0.1; }
   }
+  updateHover(p, dt);
   if (input.fire(p.id) && p.cool <= 0) playerShoot(p);
+  if (input.ice(p.id) && p.coolIce <= 0) shootShell(p, 'ice');
+  if (input.pierce(p.id) && p.coolPierce <= 0) shootShell(p, 'pierce');
+}
+// Hovercraft: over water the car drops a rubber skirt and rides on fans; back on land it turns into a car again.
+function updateHover(p, dt) {
+  const wet = overWater(p.x, p.y, p.h - 6);
+  if (wet !== p.onWater) {
+    p.onWater = wet;
+    burst(p.x, p.y, wet ? ['#e7f5ff', '#a5d8ff', '#74c0fc'] : ['#e7f5ff', '#c5cae9'], 16, 150);
+    S.particles.push({ k: 'ring', x: p.x, y: p.y, life: 0.5, max: 0.5, s: 14, color: '#d0ebff', grow: 26 });
+    if (wet) SFX.hoverOn(); else SFX.hoverOff();
+  }
+  p.hoverK = Math.max(0, Math.min(1, (p.hoverK || 0) + (wet ? 6 : -6) * dt));
+  p.moving = Math.max(0, (p.moving || 0) - dt);
+  if (!wet) return;
+  // spray kicked up behind the fans while moving, ripples on the water all the time
+  if (p.moving > 0) {
+    const bx = p.x - DX[p.dir] * 24, by = p.y - DY[p.dir] * 24;
+    for (let i = 0; i < 2; i++) {
+      const side = (Math.random() - 0.5) * 22;
+      S.particles.push({ k: 'spark', x: bx + DY[p.dir] * side, y: by - DX[p.dir] * side,
+        vx: -DX[p.dir] * (80 + Math.random() * 60) + (Math.random() - 0.5) * 50, vy: -DY[p.dir] * (80 + Math.random() * 60) + (Math.random() - 0.5) * 50,
+        life: 0.4, max: 0.4, s: 2 + Math.random() * 2.5, color: Math.random() < 0.5 ? '#ffffff' : '#a5d8ff' });
+    }
+  }
+  p.ripple = (p.ripple || 0) - dt;
+  if (p.ripple <= 0) {
+    p.ripple = p.moving > 0 ? 0.14 : 0.45;
+    S.particles.push({ k: 'ring', x: p.x - DX[p.dir] * 14, y: p.y - DY[p.dir] * 14, life: 0.7, max: 0.7, s: 16, color: 'rgba(208,235,255,0.7)', grow: 16, w: 2 });
+  }
+}
+// Special shells.
+// ice: bursts on the first car / wall it reaches (or at the end of its range); everything in the blast freezes into an ice block.
+// pierce: flies straight on, bores through up to PIERCE_WALLS steel or brick tiles and blows up every car on its path.
+const ICE_R = 78, FREEZE_TIME = 5, PIERCE_WALLS = 4;
+function shootShell(p, kind) {
+  const ice = kind === 'ice';
+  if (ice) p.coolIce = 0.7; else p.coolPierce = 0.6;
+  const mx = p.x + DX[p.dir] * 24, my = p.y + DY[p.dir] * 24, sp = ice ? 340 : 470;
+  const b = { x: mx, y: my, vx: DX[p.dir] * sp, vy: DY[p.dir] * sp, owner: 'p', by: p.id, kind, life: ice ? 1.6 : 1.4 };
+  if (!ice) { b.walls = PIERCE_WALLS; b.hits = new Set(); }
+  S.bullets.push(b);
+  burst(mx, my, ice ? ['#e7f5ff', '#a5d8ff'] : ['#ffffff', '#66d9e8'], 8, 120);
+  S.shake = Math.max(S.shake, ice ? 2 : 3);
+  if (ice) SFX.iceShot(); else SFX.pierceShot();
+}
+function shellHit(b) {
+  if (b.x < 0 || b.y < 0 || b.x >= W || b.y >= H) return true;
+  const t = S.grid[Math.floor(b.y / T)][Math.floor(b.x / T)].t;
+  if (t === BRICK || t === STEEL) return true;
+  return S.enemies.some((e) => !e.dead && e.spawn <= 0 && Math.abs(b.x - e.x) < e.h + 5 && Math.abs(b.y - e.y) < e.h + 5);
+}
+// One movement step of an armour-piercing shell; returns true once it is spent.
+function pierceStep(b) {
+  if (b.x < 0 || b.y < 0 || b.x >= W || b.y >= H) return true;
+  const r = Math.floor(b.y / T), c = Math.floor(b.x / T), g = S.grid[r][c];
+  if (g.t === TREE) fellTree(r, c);
+  if (g.t === BRICK || g.t === STEEL) {
+    const steel = g.t === STEEL, x = (c + 0.5) * T, y = (r + 0.5) * T;
+    g.t = EMPTY;
+    burst(x, y, steel ? ['#c9d3e6', '#ffffff', '#8d99ae', '#66d9e8'] : ['#d9653f', '#ffd43b', '#ffffff'], 18, 230);
+    for (let i = 0; i < 8; i++) {
+      S.particles.push({ k: 'debris', x: x + (Math.random() - 0.5) * 30, y: y + (Math.random() - 0.5) * 30,
+        vx: (Math.random() - 0.5) * 200, vy: -Math.random() * 180, life: 0.7, max: 0.7, s: 4 + Math.random() * 4, color: steel ? '#aab6cf' : '#d9653f' });
+    }
+    S.particles.push({ k: 'ring', x, y, life: 0.3, max: 0.3, s: 6, color: '#66d9e8', grow: 30 });
+    S.shake = Math.max(S.shake, 5);
+    if (throttled('bore', 40)) SFX.bore();
+    if (--b.walls <= 0) return true;
+  }
+  for (const e of S.enemies) {
+    if (e.dead || e.spawn > 0 || b.hits.has(e)) continue;
+    if (Math.abs(b.x - e.x) < e.h + 6 && Math.abs(b.y - e.y) < e.h + 6) { b.hits.add(e); killEnemy(e, false, b.by); }
+  }
+  return false;
+}
+function detonate(b) {
+  const x = Math.max(4, Math.min(W - 4, b.x)), y = Math.max(4, Math.min(H - 4, b.y));
+  if (b.kind === 'ice') iceBlast(x, y);
+  else { burst(x, y, ['#ffffff', '#66d9e8'], 12, 160); S.particles.push({ k: 'ring', x, y, life: 0.35, max: 0.35, s: 4, color: '#66d9e8', grow: 26 }); }
+}
+function flakes(x, y, n, speed) {
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + Math.random() * 0.4, v = speed * (0.4 + Math.random() * 0.6);
+    S.particles.push({ k: 'flake', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1.1, max: 1.1, s: 10 + Math.random() * 6, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 6 });
+  }
+}
+function iceBlast(x, y) {
+  let n = 0;
+  for (const e of S.enemies) {
+    if (e.dead || e.spawn > 0 || Math.hypot(e.x - x, e.y - y) > ICE_R + e.h) continue;
+    e.frozen = FREEZE_TIME;
+    n++;
+    burst(e.x, e.y, ['#e7f5ff', '#a5d8ff'], 8, 90);
+  }
+  for (const q of S.bullets) {
+    if (q.owner === 'e' && !q.dead && Math.hypot(q.x - x, q.y - y) < ICE_R) { q.dead = true; burst(q.x, q.y, ['#e7f5ff'], 5, 60); }
+  }
+  S.particles.push({ k: 'ring', x, y, life: 0.5, max: 0.5, s: 8, color: '#a5d8ff', grow: ICE_R, w: 6 });
+  S.particles.push({ k: 'ring', x, y, life: 0.35, max: 0.35, s: 4, color: '#ffffff', grow: ICE_R * 0.7 });
+  burst(x, y, ['#ffffff', '#d0ebff', '#74c0fc'], 30, 260);
+  flakes(x, y, 12, 150);
+  S.shake = Math.max(S.shake, 4);
+  SFX.ice();
+  if (n) {
+    S.floaters.push({ x, y, text: '❄️', sub: n > 1 ? `冻住 ${n} 辆！` : '冻住啦！', t: 0, life: 1.4, color: '#a5d8ff', size: 36 });
+    S.cheers.push('Freeze!');
+  }
 }
 // Shotgun: a fan of piercing pellets (the triple-shot egg widens it to 11)
 function playerShoot(p) {
@@ -945,6 +1111,7 @@ function updateEnemies(dt) {
     if (e.dead) continue;
     e.bob += dt;
     if (e.spawn > 0) { e.spawn -= dt; continue; }
+    if (e.frozen > 0) { e.frozen -= dt; continue; }   // hit by an ice shell: stuck in an ice block, can't move or shoot
     if (S.pw.freeze > 0) continue;
     const moved = moveEnt(e, e.speed * dt);
     if (!moved) {
@@ -994,15 +1161,16 @@ function damageTile(r, c, b) {
     return true;
   }
   if (g.t === TREE && b.power) {
-    g.t = EMPTY;
-    shedLeaves((c + 0.5) * T, (r + 0.5) * T);
-    if (throttled('leaves', 60)) SFX.leaves();
+    fellTree(r, c);
     return true;
   }
   return false;
 }
+// Armour-piercing rounds chop trees down: the tile clears and a shower of leaves flutters to the ground.
 const LEAF_COLORS = ['#2f9e44', '#40c057', '#69db7c', '#237a3b', '#94d82d'];
-function shedLeaves(x, y) {
+function fellTree(r, c) {
+  const x = (c + 0.5) * T, y = (r + 0.5) * T;
+  S.grid[r][c].t = EMPTY;
   for (let i = 0; i < 22; i++) {
     const life = 1.6 + Math.random() * 1.2;
     S.particles.push({ k: 'leaf', x: x + (Math.random() - 0.5) * 40, y: y + (Math.random() - 0.5) * 36,
@@ -1014,6 +1182,7 @@ function shedLeaves(x, y) {
     S.particles.push({ k: 'debris', x: x + (Math.random() - 0.5) * 20, y: y + (Math.random() - 0.5) * 20,
       vx: (Math.random() - 0.5) * 120, vy: -Math.random() * 120, life: 0.6, max: 0.6, s: 3 + Math.random() * 2, color: '#8b5a2b' });
   }
+  if (throttled('leaves', 60)) SFX.leaves();
 }
 function bulletTile(b) {
   if (b.x < 0 || b.y < 0 || b.x >= W || b.y >= H) { burst(Math.max(2, Math.min(W - 2, b.x)), Math.max(2, Math.min(H - 2, b.y)), ['#fff'], 3, 70); return true; }
@@ -1045,19 +1214,29 @@ function updateBullets(dt) {
   for (const b of S.bullets) {
     if (b.dead) continue;
     b.life -= dt;
-    if (b.life <= 0) { b.dead = true; continue; }
+    if (b.life <= 0) { if (b.kind) detonate(b); b.dead = true; continue; }
     const steps = Math.max(1, Math.ceil((Math.hypot(b.vx, b.vy) * dt) / 6));
     for (let i = 0; i < steps; i++) {
       b.x += (b.vx * dt) / steps; b.y += (b.vy * dt) / steps;
-      if (bulletTile(b) || bulletEnt(b)) { b.dead = true; break; }
+      const done = b.kind === 'pierce' ? pierceStep(b) : b.kind ? shellHit(b) : (bulletTile(b) || bulletEnt(b));
+      if (done) { if (b.kind) detonate(b); b.dead = true; break; }
+    }
+    if (b.kind && !b.dead) {
+      // snow sparkles / flame trail behind the special shells
+      if (b.kind === 'ice') S.particles.push({ k: 'spark', x: b.x, y: b.y, vx: (Math.random() - 0.5) * 40, vy: (Math.random() - 0.5) * 40, life: 0.35, max: 0.35, s: 2 + Math.random() * 2, color: Math.random() < 0.5 ? '#ffffff' : '#a5d8ff' });
+      else S.particles.push({ k: 'spark', x: b.x, y: b.y, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, life: 0.3, max: 0.3, s: 2 + Math.random() * 2, color: Math.random() < 0.5 ? '#ffffff' : '#66d9e8' });
     }
   }
-  // player bullets cancel enemy bullets
+  // player bullets cancel enemy bullets (special shells swallow them and keep flying)
   for (const a of S.bullets) {
     if (a.dead || a.owner !== 'p') continue;
     for (const b of S.bullets) {
       if (b.dead || b.owner !== 'e') continue;
-      if (Math.abs(a.x - b.x) < 9 && Math.abs(a.y - b.y) < 9) { a.dead = b.dead = true; burst(a.x, a.y, ['#fff', '#ffd43b'], 8, 100); }
+      if (Math.abs(a.x - b.x) < 9 && Math.abs(a.y - b.y) < 9) {
+        b.dead = true;
+        if (!a.kind) a.dead = true;
+        burst(a.x, a.y, a.kind === 'ice' ? ['#fff', '#a5d8ff'] : a.kind ? ['#fff', '#66d9e8'] : ['#fff', '#ffd43b'], 8, 100);
+      }
     }
   }
   S.bullets = S.bullets.filter((b) => !b.dead);
@@ -1076,6 +1255,12 @@ function killEnemy(e, viaBomb, by) {
   // the longer the streak, the bigger the blast
   const power = viaBomb ? (S.enemies.length > 12 ? 2 : 5) : Math.min(S.combo, 8);
   explode(e.x, e.y, e.color, power);
+  if (e.frozen > 0) {
+    // a frozen car shatters into ice shards
+    burst(e.x, e.y, ['#ffffff', '#d0ebff', '#74c0fc'], 22, 260);
+    flakes(e.x, e.y, 6, 120);
+    if (throttled('shatter', 60)) SFX.shatter();
+  }
   if (!viaBomb && S.combo >= 2 && S.lastKillPos) {
     S.particles.push({ k: 'bolt', x: S.lastKillPos.x, y: S.lastKillPos.y, x2: e.x, y2: e.y, life: 0.35, max: 0.35, color: RAINBOW[S.combo % RAINBOW.length] });
   }
@@ -1237,7 +1422,7 @@ function updateParticles(dt) {
   for (const q of S.particles) {
     q.life -= dt;
     if (q.vx !== undefined) { q.x += q.vx * dt; q.y += q.vy * dt; }
-    if (q.k === 'spark' || q.k === 'fire' || q.k === 'star') { q.vx *= 1 - 4 * dt; q.vy *= 1 - 4 * dt; if (q.rot !== undefined) q.rot += q.vr * dt; }
+    if (q.k === 'spark' || q.k === 'fire' || q.k === 'star' || q.k === 'flake') { q.vx *= 1 - 4 * dt; q.vy *= 1 - 4 * dt; if (q.rot !== undefined) q.rot += q.vr * dt; }
     else if (q.k === 'fw') { q.vx *= 1 - 1.6 * dt; q.vy = q.vy * (1 - 1.6 * dt) + 90 * dt; }
     else if (q.k === 'debris') { q.vy += 420 * dt; }
     else if (q.k === 'leaf') { q.vy = Math.min(q.vy + 160 * dt, 55); q.sway += dt * 3.2; q.vx = Math.sin(q.sway) * 50; q.rot += q.vr * dt; }
@@ -1403,10 +1588,27 @@ function drawPlayer(p) {
     ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 25, 0, 7); ctx.stroke();
   }
   ctx.rotate(p.dir * Math.PI / 2);
+  const hk = p.hoverK || 0, now = performance.now() / 1000;
+  if (hk > 0) {
+    // hovercraft: floats a little higher (bobbing) on a black rubber skirt with an orange stripe
+    ctx.save(); ctx.globalAlpha = hk;
+    const puff = Math.sin(now * 12) * 1.5;
+    ctx.fillStyle = 'rgba(208,235,255,0.35)';
+    ctx.beginPath(); ctx.ellipse(0, 2, 24 + puff, 29 + puff, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#23262f'; rr(-20, -25, 40, 49, 15); ctx.fill();
+    ctx.strokeStyle = '#ff922b'; ctx.lineWidth = 2; rr(-17.5, -22.5, 35, 44, 12.5); ctx.stroke();
+    ctx.restore();
+    ctx.translate(0, Math.sin(now * 8) * 1.2 * hk);
+    ctx.scale(1 + 0.05 * hk, 1 + 0.05 * hk);
+  }
   // black BMW, top-down, nose pointing up
   ctx.fillStyle = 'rgba(0,0,0,0.35)'; rr(-15, -19, 32, 41, 10); ctx.fill();
-  ctx.fillStyle = '#050608';
-  for (const [wx, wy] of [[-17, -15], [12, -15], [-17, 7], [12, 7]]) { rr(wx, wy, 5, 10, 2); ctx.fill(); }
+  if (hk < 1) {
+    // wheels tuck away as the skirt inflates
+    ctx.globalAlpha = 1 - hk; ctx.fillStyle = '#050608';
+    for (const [wx, wy] of [[-17, -15], [12, -15], [-17, 7], [12, 7]]) { rr(wx, wy, 5, 10, 2); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  }
   const body = ctx.createLinearGradient(-14, 0, 14, 0);
   body.addColorStop(0, st.side); body.addColorStop(0.5, st.mid); body.addColorStop(1, st.side);
   ctx.fillStyle = body; rr(-14, -21, 28, 41, 9); ctx.fill();
@@ -1435,6 +1637,20 @@ function drawPlayer(p) {
   ctx.strokeStyle = '#e7f5ff'; ctx.lineWidth = 1.3;
   for (const hx of [-10, 10]) { ctx.beginPath(); ctx.arc(hx, -17.5, 2.2, 0, 7); ctx.stroke(); }
   ctx.fillStyle = '#e03131'; rr(-13, 17, 6, 2.5, 1); ctx.fill(); rr(7, 17, 6, 2.5, 1); ctx.fill();
+  if (hk > 0) {
+    // two spinning fans at the back
+    ctx.globalAlpha = hk;
+    for (const fx of [-9, 9]) {
+      ctx.save(); ctx.translate(fx, 21);
+      ctx.fillStyle = '#3b4252'; ctx.strokeStyle = '#ff922b'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(0, 0, 6, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.rotate(now * (p.moving > 0 ? 40 : 18) * (fx < 0 ? 1 : -1));
+      ctx.fillStyle = '#e3e9f5';
+      for (let i = 0; i < 3; i++) { ctx.rotate((Math.PI * 2) / 3); rr(-1.3, -5.2, 2.6, 5.2, 1.2); ctx.fill(); }
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
   ctx.restore();
   drawPlate(p);
 }
@@ -1447,7 +1663,7 @@ function drawPlate(p) {
   const pl = PLATES[p.id];
   ctx.font = '700 8.5px "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif';
   const w = Math.ceil(ctx.measureText(pl.text).width) + 9, h = 12;
-  const back = p.dir % 2 === 0 ? 27 : 20 + w / 2;
+  const back = (p.dir % 2 === 0 ? 27 : 20 + w / 2) + (p.hoverK || 0) * 12;   // clear of the hovercraft fans
   const cx = Math.max(w / 2 + 1, Math.min(W - w / 2 - 1, p.x - DX[p.dir] * back));
   const cy = Math.max(h / 2 + 1, Math.min(H - h / 2 - 1, p.y - DY[p.dir] * back));
   const g = ctx.createLinearGradient(0, cy - h / 2, 0, cy + h / 2);
@@ -1458,7 +1674,7 @@ function drawPlate(p) {
   ctx.fillText(pl.text, cx, cy + 0.5);
 }
 function drawCar(e) {
-  const bounce = Math.sin(e.bob * 14) * (S.pw.freeze > 0 ? 0 : 0.8);
+  const bounce = Math.sin(e.bob * 14) * (S.pw.freeze > 0 || e.frozen > 0 ? 0 : 0.8);
   if (e.spawn > 0) {
     const k = 1 - e.spawn / 0.9;
     ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.bob * 6);
@@ -1494,7 +1710,20 @@ function drawCar(e) {
   ctx.font = '800 21px "Baloo 2", "Arial Rounded MT Bold", Arial, sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(e.ch, e.x, by + 1.5);
-  if (S.pw.freeze > 0) {
+  if (e.frozen > 0) {
+    // ice block; blinks during the last second before it thaws
+    if (!(e.frozen < 1 && Math.floor(e.frozen * 8) % 2)) {
+      ctx.fillStyle = 'rgba(165,216,255,0.55)';
+      rr(e.x - 21, e.y - 21, 42, 42, 8); ctx.fill();
+      ctx.strokeStyle = '#e7f5ff'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(e.x - 15, e.y - 8); ctx.lineTo(e.x - 8, e.y - 15);
+      ctx.moveTo(e.x - 15, e.y + 2); ctx.lineTo(e.x + 2, e.y - 15);
+      ctx.stroke();
+      ctx.font = '13px sans-serif'; ctx.fillText('❄️', e.x + 15, e.y - 15);
+    }
+  } else if (S.pw.freeze > 0) {
     ctx.fillStyle = 'rgba(190,230,255,0.38)';
     rr(e.x - 19, e.y - 19, 38, 38, 9); ctx.fill();
     ctx.font = '13px sans-serif'; ctx.fillText('❄️', e.x + 14, e.y - 14);
@@ -1521,6 +1750,40 @@ function drawEgg(g) {
 }
 function drawBullets() {
   for (const b of S.bullets) {
+    if (b.kind === 'pierce') {
+      const sp = Math.hypot(b.vx, b.vy) || 1, ux = b.vx / sp, uy = b.vy / sp;
+      ctx.strokeStyle = '#66d9e8'; ctx.lineCap = 'round';
+      ctx.globalAlpha = 0.4; ctx.lineWidth = 9;
+      ctx.beginPath(); ctx.moveTo(b.x - ux * 26, b.y - uy * 26); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(uy, ux));
+      ctx.fillStyle = '#c5f6fa'; ctx.strokeStyle = '#1098ad'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(-3, -5); ctx.lineTo(-9, -4); ctx.lineTo(-9, 4); ctx.lineTo(-3, 5); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(3, -2.5); ctx.lineTo(3, 2.5); ctx.closePath(); ctx.fill();
+      ctx.restore();
+      continue;
+    }
+    if (b.kind) {
+      const ice = b.kind === 'ice', pulse = 1 + Math.sin(performance.now() / 60) * 0.12;
+      ctx.globalAlpha = 0.4; ctx.fillStyle = ice ? '#74c0fc' : '#ff922b';
+      ctx.beginPath(); ctx.arc(b.x, b.y, 13 * pulse, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = ice ? '#d0ebff' : '#ffd43b';
+      ctx.beginPath(); ctx.arc(b.x, b.y, 7.5, 0, 7); ctx.fill();
+      ctx.fillStyle = ice ? '#ffffff' : '#fff3bf';
+      ctx.beginPath(); ctx.arc(b.x, b.y, 3.5, 0, 7); ctx.fill();
+      if (ice) {
+        // spinning snowflake arms
+        const r0 = performance.now() / 200;
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+          const a = r0 + (i * Math.PI) / 3;
+          ctx.moveTo(b.x - Math.cos(a) * 11, b.y - Math.sin(a) * 11); ctx.lineTo(b.x + Math.cos(a) * 11, b.y + Math.sin(a) * 11);
+        }
+        ctx.stroke();
+      }
+      continue;
+    }
     if (b.owner === 'p') {
       const sp = Math.hypot(b.vx, b.vy) || 1, col = b.power ? '#66d9e8' : '#ffd43b';
       ctx.strokeStyle = col; ctx.lineCap = 'round';
@@ -1596,6 +1859,11 @@ function drawParticles(top) {
     } else if (q.k === 'confetti') {
       ctx.globalAlpha = Math.min(1, a * 2); ctx.fillStyle = q.color;
       ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.fillRect(-q.s / 2, -q.s, q.s, q.s * 2); ctx.restore();
+    } else if (q.k === 'flake') {
+      ctx.globalAlpha = Math.min(1, a * 1.6); ctx.fillStyle = '#e7f5ff';
+      ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot);
+      ctx.font = `${q.s}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('❄', 0, 0); ctx.restore();
     }
   }
   ctx.globalAlpha = 1;
