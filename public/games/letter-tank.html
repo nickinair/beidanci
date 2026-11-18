@@ -546,6 +546,7 @@ const SFX = {
   },
   brick() { noise(0.12, { vol: 0.3, f: 900, f2: 200, type: 'bandpass', q: 1.4 }); },
   steel() { tone(1500, 0.14, { type: 'triangle', vol: 0.14, to: 1150 }); },
+  leaves() { noise(0.45, { vol: 0.28, f: 2500, f2: 900, type: 'bandpass', q: 0.8 }); noise(0.25, { vol: 0.18, f: 600, f2: 200, delay: 0.05 }); },
   spawn() { tone(420, 0.16, { type: 'sine', vol: 0.07, to: 940 }); },
   hurt() { tone(420, 0.4, { type: 'sawtooth', vol: 0.16, to: 80 }); noise(0.3, { vol: 0.25, f: 600 }); },
   combo(n) {
@@ -992,7 +993,27 @@ function damageTile(r, c, b) {
     } else if (throttled('steel', 60)) SFX.steel();
     return true;
   }
+  if (g.t === TREE && b.power) {
+    g.t = EMPTY;
+    shedLeaves((c + 0.5) * T, (r + 0.5) * T);
+    if (throttled('leaves', 60)) SFX.leaves();
+    return true;
+  }
   return false;
+}
+const LEAF_COLORS = ['#2f9e44', '#40c057', '#69db7c', '#237a3b', '#94d82d'];
+function shedLeaves(x, y) {
+  for (let i = 0; i < 22; i++) {
+    const life = 1.6 + Math.random() * 1.2;
+    S.particles.push({ k: 'leaf', x: x + (Math.random() - 0.5) * 40, y: y + (Math.random() - 0.5) * 36,
+      vx: (Math.random() - 0.5) * 90, vy: -40 - Math.random() * 110, life, max: life,
+      s: 5 + Math.random() * 4, rot: Math.random() * 6.3, vr: (Math.random() - 0.5) * 7,
+      sway: Math.random() * 6.3, color: LEAF_COLORS[i % LEAF_COLORS.length] });
+  }
+  for (let i = 0; i < 6; i++) {
+    S.particles.push({ k: 'debris', x: x + (Math.random() - 0.5) * 20, y: y + (Math.random() - 0.5) * 20,
+      vx: (Math.random() - 0.5) * 120, vy: -Math.random() * 120, life: 0.6, max: 0.6, s: 3 + Math.random() * 2, color: '#8b5a2b' });
+  }
 }
 function bulletTile(b) {
   if (b.x < 0 || b.y < 0 || b.x >= W || b.y >= H) { burst(Math.max(2, Math.min(W - 2, b.x)), Math.max(2, Math.min(H - 2, b.y)), ['#fff'], 3, 70); return true; }
@@ -1219,6 +1240,7 @@ function updateParticles(dt) {
     if (q.k === 'spark' || q.k === 'fire' || q.k === 'star') { q.vx *= 1 - 4 * dt; q.vy *= 1 - 4 * dt; if (q.rot !== undefined) q.rot += q.vr * dt; }
     else if (q.k === 'fw') { q.vx *= 1 - 1.6 * dt; q.vy = q.vy * (1 - 1.6 * dt) + 90 * dt; }
     else if (q.k === 'debris') { q.vy += 420 * dt; }
+    else if (q.k === 'leaf') { q.vy = Math.min(q.vy + 160 * dt, 55); q.sway += dt * 3.2; q.vx = Math.sin(q.sway) * 50; q.rot += q.vr * dt; }
     else if (q.k === 'confetti') { q.rot += q.vr * dt; q.vx += Math.sin(q.life * 4) * 20 * dt; }
   }
   S.particles = S.particles.filter((q) => q.life > 0);
@@ -1518,7 +1540,7 @@ function drawBullets() {
 }
 function drawParticles(top) {
   for (const q of S.particles) {
-    const isTop = q.k === 'confetti' || q.k === 'fw' || q.k === 'bolt' || q.k === 'shock';
+    const isTop = q.k === 'confetti' || q.k === 'fw' || q.k === 'bolt' || q.k === 'shock' || q.k === 'leaf';
     if (isTop !== top) continue;
     const a = Math.max(0, q.life / q.max);
     if (q.k === 'spark' || q.k === 'fw' || q.k === 'debris') {
@@ -1564,6 +1586,13 @@ function drawParticles(top) {
     } else if (q.k === 'flash') {
       ctx.globalAlpha = a * 0.9; ctx.fillStyle = '#fff6d6';
       ctx.beginPath(); ctx.arc(q.x, q.y, q.s * (0.6 + (1 - a)), 0, 7); ctx.fill();
+    } else if (q.k === 'leaf') {
+      ctx.globalAlpha = Math.min(1, a * 2.5); ctx.fillStyle = q.color;
+      ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot);
+      ctx.beginPath(); ctx.ellipse(0, 0, q.s, q.s * 0.45, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(20,60,30,0.6)'; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(-q.s, 0); ctx.lineTo(q.s, 0); ctx.stroke();
+      ctx.restore();
     } else if (q.k === 'confetti') {
       ctx.globalAlpha = Math.min(1, a * 2); ctx.fillStyle = q.color;
       ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.fillRect(-q.s / 2, -q.s, q.s, q.s * 2); ctx.restore();
