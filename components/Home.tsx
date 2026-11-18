@@ -252,6 +252,11 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, 
         字母坦克大战：打小车，学字母
       </a>
 
+      <a href="/games/brick-breaker.html" className="mt-3 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500/20 to-cyan-500/20 border border-amber-500/20 py-3 rounded-xl text-amber-300 text-sm font-medium hover:from-amber-500/30 hover:to-cyan-500/30 transition-all">
+        <Gamepad2 size={16} />
+        双人打砖块：两个人一起玩
+      </a>
+
       <button onClick={onViewRules} className="mt-3 mb-2 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/20 py-3 rounded-xl text-amber-400 text-sm font-medium hover:from-amber-500/30 hover:to-orange-500/30 transition-all">
         <Info size={16} />
         规则与福利：冲分赢好礼！
