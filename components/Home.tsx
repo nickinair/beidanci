@@ -257,6 +257,11 @@ const Home: React.FC<HomeProps> = ({ user, onStart, onViewRewards, onViewRules, 
         双人打砖块：两个人一起玩
       </a>
 
+      <a href="/games/foosball.html" className="mt-3 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-600/20 to-amber-700/20 border border-green-500/20 py-3 rounded-xl text-green-300 text-sm font-medium hover:from-green-600/30 hover:to-amber-700/30 transition-all">
+        <Gamepad2 size={16} />
+        桌上足球：红队对蓝队
+      </a>
+
       <button onClick={onViewRules} className="mt-3 mb-2 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/20 py-3 rounded-xl text-amber-400 text-sm font-medium hover:from-amber-500/30 hover:to-orange-500/30 transition-all">
         <Info size={16} />
         规则与福利：冲分赢好礼！
