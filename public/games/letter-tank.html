@@ -57,6 +57,8 @@ button:focus-visible, a:focus-visible, label:focus-within { outline: 3px solid v
 .combo .lbl { color: #2a0d12; font-weight: 700; }
 .combo i { position: absolute; left: 0; bottom: 0; height: 3px; background: #2a0d12; opacity: .45; }
 .spacer { flex: 1; }
+.pill.song { cursor: pointer; color: var(--text); border-color: var(--sun); font-family: var(--body); }
+.pill.song b { font-size: 14px; }
 .powers { display: flex; gap: 4px; }
 .powers span { padding: 3px 8px; border-radius: 999px; background: var(--panel); border: 1px solid var(--sun); font-size: 13px; font-variant-numeric: tabular-nums; }
 .icon-btn {
@@ -159,6 +161,7 @@ button:focus-visible, a:focus-visible, label:focus-within { outline: 3px solid v
     <div class="pill combo" id="hudCombo" hidden><span class="lbl">连击</span><b id="hudComboN">×2</b><i id="hudComboBar"></i></div>
     <div class="spacer"></div>
     <div class="powers" id="hudPowers"></div>
+    <button class="pill song" id="hudSong" type="button" hidden aria-label="停止音乐">🎵 <b>想念</b><span class="lbl">梁博 · 点我停止</span></button>
     <button id="btnMute" class="icon-btn" type="button" aria-label="声音开关">🔊</button>
     <button id="btnPause" class="icon-btn" type="button" aria-label="暂停">⏸</button>
   </header>
@@ -206,10 +209,23 @@ button:focus-visible, a:focus-visible, label:focus-within { outline: 3px solid v
           1P（黑色宝马）：<kbd>↑↓←→</kbd> 移动，<kbd>空格</kbd> 发射散弹，<kbd>Esc</kbd> 暂停<br>
           1P 特殊炮弹：<kbd>右 Shift</kbd> ❄️ 冰冻炮弹（冻住一片小车，再打就碎），<kbd>回车</kbd> 💎 穿甲弹（打穿钢板和砖墙、砍倒树木，一路上的小车全打爆）<br>
           2P（白色宝马）：<kbd>W A S D</kbd> 移动，<kbd>左 Shift</kbd> 发射散弹<br>
-          按 <kbd>A</kbd>–<kbd>Z</kbd> 或 <kbd>0</kbd>–<kbd>9</kbd>：马上冒出一辆这个字母的小车，一直放到满屏为止<br>
+          按 <kbd>A</kbd>–<kbd>Z</kbd> 或 <kbd>0</kbd>–<kbd>9</kbd>：马上冒出一辆这个字母的小车，一直放到满屏为止（<kbd>H</kbd> 除外）<br>
+          长按 <kbd>H</kbd> 按喇叭 📯；快速连按 3 次 <kbd>H</kbd> 播放梁博《想念》🎵，再连按 3 次停止<br>
           手机：左下角方向盘移动，右下角按住开火，❄️ / 💎 发特殊炮弹<br>
           开到河面上会自动变成气垫船 🛥️，上岸就变回小汽车（字母小车过不了河哦）<br>
           小提示：连续打爆 3 辆以上有彩蛋哦 🥚
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="ovSong" hidden>
+      <div class="card">
+        <h2>🎵 梁博《想念》</h2>
+        <p id="songMsg">游戏里没有自带这首歌（歌曲有版权）。选一下你电脑或手机里的《想念》音乐文件，以后在这个浏览器里连按 3 次 <b>H</b> 就直接播放。</p>
+        <input type="file" id="songFile" accept="audio/*" hidden>
+        <div class="row">
+          <button class="btn" id="btnPickSong" type="button">选择音乐文件</button>
+          <button class="btn ghost" id="btnSongCancel" type="button">先不了</button>
         </div>
       </div>
     </div>
@@ -792,6 +808,8 @@ window.addEventListener('keydown', (e) => {
     if (inGame) { e.preventDefault(); pads[0].pierce = true; }
   } else if (e.code === 'Escape') {
     if (S && S.running && !S.over) togglePause();
+  } else if (e.code === 'KeyH' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (inGame) { e.preventDefault(); if (!e.repeat) hKeyDown(); }
   } else if (inGame && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && /^(Key[A-Z]|Digit[0-9]|Numpad[0-9])$/.test(e.code)) {
     e.preventDefault();
     spawnByKey(e.code.slice(-1));
@@ -804,8 +822,10 @@ window.addEventListener('keyup', (e) => {
   if (e.code === 'ShiftLeft') pads[1].fire = false;
   if (e.code === 'ShiftRight') pads[0].ice = false;
   if (e.code === 'Enter' || e.code === 'NumpadEnter') pads[0].pierce = false;
+  if (e.code === 'KeyH') hKeyUp();
 });
 function releaseAll() {
+  hKeyUp(true);
   pads.forEach((pd) => { pd.held.length = 0; pd.fire = false; pd.ice = false; pd.pierce = false; });
   touchFire = touchIce = touchPierce = false; setTouchDir(-1);
   ['fire', 'fireIce', 'firePierce'].forEach((id) => $(id).classList.remove('on'));
@@ -1991,6 +2011,7 @@ function togglePause() {
   $('ovPause').hidden = !S.paused;
   $('btnPause').textContent = S.paused ? '▶' : '⏸';
   if (S.paused) { hush(); $('btnResume').focus(); }
+  musicFollowPause(S.paused);
 }
 function showSummary(title) {
   S.running = false;
@@ -2037,15 +2058,175 @@ function applyMute() {
   $('btnMute').textContent = muted ? '🔇' : '🔊';
   if (master) master.gain.value = muted ? 0 : 0.6;
   if (muted) hush();
+  music.muted = muted;
 }
 $('btnMute').addEventListener('click', () => { initAudio(); muted = !muted; store.set('muted', muted); applyMute(); });
+
+// ---------- H key: car horn and the song ----------
+// Hold H (longer than HORN_HOLD) to sound the horn until it is released.
+// Three quick taps of H (within TAP_WINDOW) start 梁博《想念》; three more stop it.
+const HORN_HOLD = 250, TAP_WINDOW = 1200;
+let hDownAt = 0, hornTimer = null, honking = false, hornNodes = null, hornFxT = 0, hTaps = [];
+function hornOn() {
+  honking = true;
+  initAudio();
+  if (AC && !muted) {
+    // two detuned horn notes (about G#4 + C5) through a low-pass, like a car's dual-tone horn
+    const t = AC.currentTime, g = AC.createGain(), lp = AC.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 1700;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.2, t + 0.03);
+    const oscs = [415, 523].map((f) => { const o = AC.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.connect(lp); o.start(t); return o; });
+    lp.connect(g).connect(master);
+    hornNodes = { g, oscs };
+  }
+  const p = activePlayers()[0];
+  if (p) S.floaters.push({ x: p.x, y: p.y - 18, text: '📯', sub: '嘀——', t: 0, life: 1.2, color: '#ffd43b', size: 30 });
+}
+function hornOff() {
+  honking = false;
+  if (!hornNodes) return;
+  const t = AC.currentTime, { g, oscs } = hornNodes;
+  g.gain.cancelScheduledValues(t);
+  g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+  oscs.forEach((o) => o.stop(t + 0.1));
+  hornNodes = null;
+}
+function hornFx(dt) {
+  // sound waves rolling out of the front of 1P's car while the horn is held
+  const p = activePlayers()[0];
+  hornFxT -= dt;
+  if (!p || hornFxT > 0) return;
+  hornFxT = 0.16;
+  S.particles.push({ k: 'ring', x: p.x + DX[p.dir] * 22, y: p.y + DY[p.dir] * 22, life: 0.5, max: 0.5, s: 8, color: '#ffd43b', grow: 46, w: 3 });
+}
+function hKeyDown() {
+  hDownAt = performance.now();
+  clearTimeout(hornTimer);
+  hornTimer = setTimeout(hornOn, HORN_HOLD);
+}
+function hKeyUp(cancel) {
+  clearTimeout(hornTimer);
+  if (!hDownAt) return;
+  const now = performance.now(), wasHorn = honking;
+  hDownAt = 0;
+  hornOff();
+  if (cancel || wasHorn) { hTaps = []; return; }
+  hTaps = hTaps.filter((t) => now - t < TAP_WINDOW);
+  hTaps.push(now);
+  if (hTaps.length >= 3) { hTaps = []; toggleSong(); }
+}
+
+const SONG = { title: '想念', artist: '梁博', file: 'music/xiangnian.mp3' };
+const music = new Audio();
+music.preload = 'auto';
+music.muted = muted;
+let songUrl = null, musicWasPlaying = false;
+// The chosen song file is kept in this browser (IndexedDB) so it only has to be picked once.
+function idb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('letterTank', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('files');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbGet(key) {
+  try {
+    const db = await idb();
+    return await new Promise((resolve) => {
+      const r = db.transaction('files').objectStore('files').get(key);
+      r.onsuccess = () => resolve(r.result || null);
+      r.onerror = () => resolve(null);
+    });
+  } catch (e) { return null; }
+}
+async function idbPut(key, value) {
+  try {
+    const db = await idb();
+    db.transaction('files', 'readwrite').objectStore('files').put(value, key);
+  } catch (e) { /* storage unavailable: the song still plays for this visit */ }
+}
+async function findSong() {
+  if (songUrl) return songUrl;
+  const saved = await idbGet('song');
+  if (saved) { songUrl = URL.createObjectURL(saved); return songUrl; }
+  // a copy placed next to the game (public/games/music/xiangnian.mp3 in the app)
+  try {
+    const r = await fetch(SONG.file, { method: 'HEAD' });
+    if (r.ok) { songUrl = SONG.file; return songUrl; }
+  } catch (e) { /* not bundled */ }
+  return null;
+}
+function showSongChip(on) { $('hudSong').hidden = !on; }
+function playSong(url) {
+  if (music.src !== new URL(url, location.href).href) music.src = url;
+  music.currentTime = 0;
+  music.muted = muted;
+  music.volume = 0.85;
+  return music.play().then(() => {
+    showSongChip(true);
+    showBanner('🎵 想念', '梁博', 2);
+    hush();
+  });
+}
+function stopSong() {
+  music.pause();
+  musicWasPlaying = false;
+  showSongChip(false);
+}
+async function toggleSong() {
+  if (!music.paused) { stopSong(); showBanner('音乐停了', '', 1); return; }
+  const url = await findSong();
+  if (!url) { openSongPicker(); return; }
+  playSong(url).catch(() => openSongPicker('点一下下面的按钮开始播放。', true));
+}
+let songPickerPaused = false;
+function openSongPicker(msg, readyToPlay) {
+  hKeyUp(true);
+  if (S && S.running && !S.paused && !S.over) { S.paused = true; songPickerPaused = true; }
+  if (msg) $('songMsg').textContent = msg;
+  $('btnPickSong').textContent = readyToPlay ? '▶ 开始播放' : '选择音乐文件';
+  $('btnPickSong').dataset.play = readyToPlay ? '1' : '';
+  $('ovSong').hidden = false;
+  $('btnPickSong').focus();
+}
+function closeSongPicker() {
+  $('ovSong').hidden = true;
+  if (songPickerPaused && S) { S.paused = false; songPickerPaused = false; }
+}
+music.addEventListener('ended', () => showSongChip(false));
+function musicFollowPause(paused) {
+  if (paused) { musicWasPlaying = !music.paused; music.pause(); }
+  else if (musicWasPlaying) { music.play().catch(() => {}); }
+}
+$('btnPickSong').addEventListener('click', () => {
+  if ($('btnPickSong').dataset.play && songUrl) {
+    playSong(songUrl).then(closeSongPicker, () => { $('songMsg').textContent = '这个文件播放不了，换一个 mp3 / m4a 试试。'; });
+    return;
+  }
+  $('songFile').click();
+});
+$('songFile').addEventListener('change', () => {
+  const f = $('songFile').files && $('songFile').files[0];
+  if (!f) return;
+  if (songUrl && songUrl.startsWith('blob:')) URL.revokeObjectURL(songUrl);
+  songUrl = URL.createObjectURL(f);
+  idbPut('song', f);
+  $('songFile').value = '';
+  // the file dialog can take longer than the browser's play-permission window, so confirm with one more click
+  openSongPicker(`已选好：${f.name}。`, true);
+});
+$('btnSongCancel').addEventListener('click', closeSongPicker);
+$('hudSong').addEventListener('click', stopSong);
 
 // ---------- loop ----------
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.033, (now - last) / 1000);
   last = now;
-  if (S.running && !S.paused) { update(dt); updateHud(); }
+  if (S.running && !S.paused) { update(dt); updateHud(); if (honking) hornFx(dt); }
   else if (!S.running) {
     // idle animation behind menus
     S.time += dt;
