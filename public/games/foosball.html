@@ -52,6 +52,9 @@ button:focus-visible, a:focus-visible, label:focus-within { outline: 3px solid v
 .nums { font-family: var(--round); font-weight: 800; font-size: 30px; line-height: 1; letter-spacing: .04em; }
 .nums .r { color: var(--red); } .nums .b { color: var(--blue); }
 .target { font-size: 12px; color: var(--muted); font-family: var(--body); }
+.whirl { font-size: 12px; font-family: var(--body); padding: 2px 8px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); font-variant-numeric: tabular-nums; }
+.whirl.ready.r { color: var(--red); border-color: var(--red); font-weight: 700; }
+.whirl.ready.b { color: var(--blue); border-color: var(--blue); font-weight: 700; }
 .icon-btn {
   width: 36px; height: 36px; display: inline-grid; place-items: center; border-radius: 10px;
   background: var(--panel); border: 1px solid var(--line); cursor: pointer; text-decoration: none; color: var(--ink); font-size: 16px;
@@ -106,9 +109,11 @@ button:focus-visible, a:focus-visible, label:focus-within { outline: 3px solid v
   <header class="hud">
     <a id="backLink" class="icon-btn" href="/" aria-label="返回英榜" hidden>←</a>
     <div class="score">
+      <span class="whirl r ready" id="whirlRed">🌪️ 就绪</span>
       <span class="team red"><i></i><span id="nameRed">红队</span></span>
       <span class="nums"><span class="r" id="scoreRed">0</span> : <span class="b" id="scoreBlue">0</span></span>
       <span class="team blue"><span id="nameBlue">蓝队</span><i></i></span>
+      <span class="whirl b ready" id="whirlBlue">🌪️ 就绪</span>
       <span class="target" id="targetText">先进 5 球获胜</span>
     </div>
     <button id="btnMute" class="icon-btn" type="button" aria-label="声音开关">🔊</button>
@@ -146,8 +151,9 @@ button:focus-visible, a:focus-visible, label:focus-within { outline: 3px solid v
         </div>
         <button class="btn" id="btnStart" type="button">开球</button>
         <div class="help">
-          <b class="r">红队</b>（左边球门）：<kbd>W</kbd> <kbd>S</kbd> 推拉杆子，<kbd>D</kbd> 或 <kbd>空格</kbd> 踢球，按住一直转<br>
-          <b class="b">蓝队</b>（右边球门）：<kbd>↑</kbd> <kbd>↓</kbd> 推拉杆子，<kbd>←</kbd> 或 <kbd>回车</kbd> 踢球，按住一直转<br>
+          <b class="r">红队</b>（左边球门）：<kbd>W</kbd> <kbd>S</kbd> 推拉杆子，<kbd>D</kbd> 或 <kbd>空格</kbd> 踢球，按住一直转，<kbd>左 Shift</kbd> 🌪️ 无敌旋风腿<br>
+          <b class="b">蓝队</b>（右边球门）：<kbd>↑</kbd> <kbd>↓</kbd> 推拉杆子，<kbd>←</kbd> 踢球，按住一直转，<kbd>回车</kbd> 🌪️ 无敌旋风腿<br>
+          🌪️ 无敌旋风腿：全队杆子朝对方球门疯狂旋转 2 秒，碰到球就把它轰向对方球门；用完要等 6 秒才能再用。1 人模式下回车和左 Shift 都是你的旋风腿<br>
           手机平板：手指在球台左半边上下拖控制红队、右半边控制蓝队，点一下踢球。<kbd>Esc</kbd> 暂停
         </div>
       </div>
@@ -206,6 +212,8 @@ const TEAM = [
   { name: '蓝队', dir: -1, shirt: '#1c7ed6', shirtDark: '#14589a', trim: '#ffffff', shorts: '#ff922b', sock: '#1c7ed6' },
 ];
 const KICK_T = 0.3, SPIN_W = 24;
+// 无敌旋风腿: the whole team spins flat out toward the other goal; any touch launches the ball at the goal
+const WHIRL_T = 2, WHIRL_COOL = 6, WHIRL_W = 52, WHIRL_SPEED = 1750, WHIRL_R = 8;
 
 const $ = (id) => document.getElementById(id);
 if (/\/games\//.test(location.pathname)) $('backLink').hidden = false;
@@ -297,6 +305,34 @@ const SFX = {
   },
   whistle() { whistle(0, 1, 0.35); },
   bump() { noise(0.18, { vol: 0.4, f: 400, f2: 90 }); tone(80, 0.2, { vol: 0.35, to: 45 }); },
+  // tornado: roaring wind swirling up and down, a rising rumble, a gust on every turn
+  whirl() {
+    if (quiet()) return;
+    const t = AC.currentTime, dur = WHIRL_T + 0.2;
+    const src = AC.createBufferSource(), bp = AC.createBiquadFilter(), g = AC.createGain(), lfo = AC.createOscillator(), lg = AC.createGain();
+    src.buffer = noiseBuf; src.loop = true;
+    bp.type = 'bandpass'; bp.Q.value = 1.6; bp.frequency.value = 1300;
+    lfo.frequency.value = 7; lg.gain.value = 750;
+    lfo.connect(lg).connect(bp.frequency);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.15);
+    g.gain.setValueAtTime(0.5, t + dur - 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp).connect(g).connect(master);
+    const o = AC.createOscillator(), lp = AC.createBiquadFilter(), og = AC.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(55, t); o.frequency.exponentialRampToValueAtTime(120, t + dur);
+    lp.type = 'lowpass'; lp.frequency.value = 320;
+    og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(0.25, t + 0.1); og.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(lp).connect(og).connect(master);
+    [src, lfo, o].forEach((n) => { n.start(t); n.stop(t + dur + 0.05); });
+    for (let i = 0; i < 10; i++) noise(0.12, { vol: 0.2, f: 2600, f2: 600, type: 'bandpass', q: 2, delay: i * 0.2 });
+  },
+  // the launch: a deep boom with a crack on top, the whoosh of the ball, and the crowd gasping
+  blast() {
+    noise(0.9, { vol: 0.9, f: 3500, f2: 60 });
+    tone(160, 0.7, { vol: 0.7, to: 32 });
+    noise(0.06, { vol: 0.6, f: 4000, type: 'highpass' });
+    noise(0.5, { vol: 0.35, f: 500, f2: 4500, type: 'bandpass', q: 1.5, delay: 0.05 });
+    cheer(1.4, 0.3);
+  },
   win() {
     whistle(0, 3, 0.22);
     cheer(4, 0.55);
@@ -369,12 +405,12 @@ function makeState(demo) {
   return {
     demo, time: 0, paused: false, over: false,
     teams: [0, 1].map((t) => ({ id: t, dir: TEAM[t].dir, norm: 0, target: null, up: false, down: false, kickHeld: false, kickTap: false,
-      ai: false, aiCool: 0, score: 0, shots: 0 })),
+      ai: false, aiCool: 0, score: 0, shots: 0, whirl: 0, whirlCool: 0, whirls: 0 })),
     rods: ROD_LAYOUT.map((d, i) => ({
       ...d, x: FX + FW / 16 + i * FW / 8, off: 0, vy: 0, a: 0, w: 0, phase: 'idle', t: 0,
       range: d.range !== undefined ? d.range : (FH - 2 * FIG_HALF - (d.n - 1) * d.gap) / 2 - 2,
     })),
-    ball: null, stall: 0, goal: null, serveIn: 0.6, serveSide: -1, banner: null, particles: [], shake: 0, winner: null,
+    ball: null, stall: 0, goal: null, serveIn: 0.6, serveSide: -1, banner: null, particles: [], pops: [], shake: 0, flash: 0, winner: null, lastBlast: -9,
   };
 }
 function figY(rod, k) { return FCY + rod.off + (k - (rod.n - 1) / 2) * rod.gap; }
@@ -414,6 +450,11 @@ function updateRods(dt) {
       SFX.kick();
     }
     team.kickTap = false;
+    if (team.whirlCool > 0) team.whirlCool -= dt;
+    if (team.whirl > 0) {
+      team.whirl -= dt;
+      if (team.whirl <= 0) for (const r of S.rods) if (r.team === team.id && r.phase === 'whirl') r.phase = 'settle';
+    }
   }
   for (const r of S.rods) {
     const team = S.teams[r.team];
@@ -425,6 +466,9 @@ function updateRods(dt) {
       r.t += dt;
       if (r.t >= KICK_T) { r.a = 0; r.phase = team.kickHeld ? 'spin' : 'idle'; }
       else r.a = (r.kdir || 1) * kickProfile(r.t);
+    } else if (r.phase === 'whirl') {
+      r.a = wrap(r.a + WHIRL_W * dt);
+      whirlWind(r);
     } else if (r.phase === 'spin' || r.phase === 'settle') {
       r.a = wrap(r.a + SPIN_W * dt);
       SFX.spin();
@@ -435,22 +479,65 @@ function updateRods(dt) {
   }
 }
 
+function startWhirl(team) {
+  if (!S || S.over || team.whirl > 0 || team.whirlCool > 0) return;
+  team.whirl = WHIRL_T;
+  team.whirlCool = WHIRL_T + WHIRL_COOL;
+  team.whirls++;
+  for (const r of S.rods) if (r.team === team.id) r.phase = 'whirl';
+  showBanner('🌪️ 无敌旋风腿！', TEAM[team.id].name, 1.3, TEAM[team.id].shirt);
+  S.shake = Math.max(S.shake, 6);
+  SFX.whirl();
+  say('Whirlwind!');
+}
+// gusts streaming off the spinning figures toward the other goal
+function whirlWind(r) {
+  if (Math.random() > 0.55) return;
+  const dir = TEAM[r.team].dir, k = Math.floor(Math.random() * r.n), y = figY(r, k);
+  const a = Math.random() * Math.PI * 2, d = 14 + Math.random() * 18;
+  S.particles.push({ k: 'wind', x: r.x + Math.cos(a) * d, y: y + Math.sin(a) * d, vx: dir * (260 + Math.random() * 200), vy: (Math.random() - 0.5) * 120,
+    life: 0.32, max: 0.32, s: 2, color: Math.random() < 0.5 ? '#ffffff' : TEAM[r.team].shirt });
+}
+// a whirling figure touched the ball: launch it at the middle of the other goal
+function blastBall(b, r, x, y) {
+  const dir = TEAM[r.team].dir;
+  const gx = dir > 0 ? FX + FW + GOAL_D : FX - GOAL_D, gy = FCY + (Math.random() - 0.5) * 70;
+  const dx = gx - b.x, dy = gy - b.y, d = Math.hypot(dx, dy) || 1;
+  b.vx = (dx / d) * WHIRL_SPEED; b.vy = (dy / d) * WHIRL_SPEED;
+  b.blast = 1.2; b.blastTeam = r.team; b.trail = [];
+  S.teams[r.team].shots++;
+  S.sinceTouch = 0;
+  if (S.time - S.lastBlast < 0.25) return;   // one boom per launch
+  S.lastBlast = S.time;
+  S.shake = 16; S.flash = 0.5;
+  SFX.blast();
+  const cols = [TEAM[r.team].shirt, '#ffffff', '#ffd43b', '#ff922b'];
+  for (let i = 0; i < 46; i++) {
+    const a = Math.random() * Math.PI * 2, v = 150 + Math.random() * 420;
+    S.particles.push({ k: 'spark', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.5 + Math.random() * 0.3, max: 0.8, s: 3 + Math.random() * 4, color: cols[i % cols.length] });
+  }
+  S.particles.push({ k: 'ring', x, y, vx: 0, vy: 0, life: 0.5, max: 0.5, s: 10, grow: 150, color: '#ffffff' });
+  S.particles.push({ k: 'ring', x, y, vx: 0, vy: 0, life: 0.7, max: 0.7, s: 6, grow: 110, color: TEAM[r.team].shirt });
+  S.pops.push({ x, y: y - 30, text: '旋风腿！', t: 0, life: 1.1, color: TEAM[r.team].shirt });
+}
+
 // ---------- ball ----------
 function collideFigures(b) {
   for (const r of S.rods) {
-    const ca = Math.cos(r.a);
-    if (ca < 0.42) continue;   // figure tipped up: its feet are above the ball
+    const ca = Math.cos(r.a), whirl = r.phase === 'whirl';
+    if (ca < 0.42 && !whirl) continue;   // figure tipped up: its feet are above the ball
     const dir = TEAM[r.team].dir;
-    const reach = Math.sin(r.a) * REACH * dir;   // how far the foot sticks out along the table
+    const reach = whirl ? 0 : Math.sin(r.a) * REACH * dir;   // how far the foot sticks out along the table
     for (let k = 0; k < r.n; k++) {
       const py = figY(r, k);
-      if (Math.abs(b.y - py) > BALL_R + FIG_R + 2) continue;
+      if (Math.abs(b.y - py) > BALL_R + FIG_R + WHIRL_R + 2) continue;
       const ax = r.x, bx = r.x + reach;
       const lo = Math.min(ax, bx), hi = Math.max(ax, bx);
       const cx = Math.max(lo, Math.min(hi, b.x));
-      const dx = b.x - cx, dy = b.y - py, dist = Math.hypot(dx, dy), R = BALL_R + FIG_R;
+      const dx = b.x - cx, dy = b.y - py, dist = Math.hypot(dx, dy), R = BALL_R + FIG_R + (whirl ? WHIRL_R : 0);
       if (dist >= R) continue;
       const nx = dist > 0.001 ? dx / dist : -dir, ny = dist > 0.001 ? dy / dist : 0;
+      if (whirl) { b.x = cx + nx * R; b.y = py + ny * R; blastBall(b, r, cx + nx * FIG_R, py + ny * FIG_R); continue; }
       // speed of the figure's surface at the contact point: the rod slide plus the foot swing
       const lever = 10 + Math.abs(cx - r.x);
       const vpx = dir * ca * lever * r.w, vpy = r.vy;
@@ -465,8 +552,8 @@ function collideFigures(b) {
         SFX.hit(power);
         sparkle(cx + nx * FIG_R, py + ny * FIG_R, power);
       }
-      const sp = Math.hypot(b.vx, b.vy);
-      if (sp > MAX_SPEED) { b.vx *= MAX_SPEED / sp; b.vy *= MAX_SPEED / sp; }
+      const sp = Math.hypot(b.vx, b.vy), cap = b.blast > 0 ? WHIRL_SPEED : MAX_SPEED;
+      if (sp > cap) { b.vx *= cap / sp; b.vy *= cap / sp; }
     }
   }
 }
@@ -512,6 +599,11 @@ function updateBall(dt) {
     collideWalls(b);
     if (!b.inGoal) collideFigures(b);
   }
+  if (b.blast > 0) {
+    b.blast -= dt;
+    b.trail.push(b.x, b.y);
+    if (b.trail.length > 28) b.trail.splice(0, 2);
+  }
   // rolling friction on felt
   const f = Math.exp(-0.5 * dt);
   b.vx *= f; b.vy *= f;
@@ -543,8 +635,10 @@ function scoreGoal(team) {
   const conceded = team === RED ? BLUE : RED;
   const gx = conceded === RED ? FX - GOAL_D / 2 : FX + FW + GOAL_D / 2;
   confetti(gx, FCY, TEAM[team].shirt);
-  showBanner('进球啦！', `${TEAM[team].name} ${S.teams[RED].score} : ${S.teams[BLUE].score}`, 2.2, TEAM[team].shirt);
-  say('Goal!');
+  const super_ = b.blast > 0 && b.blastTeam === team;
+  showBanner(super_ ? '🌪️ 旋风腿进球！' : '进球啦！', `${TEAM[team].name} ${S.teams[RED].score} : ${S.teams[BLUE].score}`, super_ ? 2.6 : 2.2, TEAM[team].shirt);
+  if (super_) { confetti(gx, FCY - 40, '#ffd43b'); confetti(gx, FCY + 40, TEAM[team].shirt); S.flash = 0.6; SFX.blast(); }
+  say(super_ ? 'Super goal!' : 'Goal!');
   updateHud();
   if (S.teams[team].score >= settings.target && !S.demo) {
     S.winner = team;
@@ -602,6 +696,10 @@ function updateAI(team, dt) {
   }
   if (team.aimWobbleT === undefined || S.time > team.aimWobbleT) { team.aimWobble = (Math.random() - 0.5) * lv.aim; team.aimWobbleT = S.time + 0.6; }
   team.target = best + team.aimWobble / rod.range;
+  if (team.level === 'normal' && team.whirlCool <= 0 && b && !b.inGoal && Math.abs(b.y - FCY) < 170 && Math.random() < dt * 0.6) {
+    const near = S.rods.some((r) => r.team === team.id && r.n >= 3 && (b.x - r.x) * team.dir > -10 && (b.x - r.x) * team.dir < 60);
+    if (near) startWhirl(team);
+  }
   // kick when the ball sits just in front of one of our figures
   if (team.aiCool > 0) return;
   for (const r of S.rods) {
@@ -642,10 +740,14 @@ function showBanner(title, sub, dur, color) { S.banner = { title, sub, t: 0, dur
 function updateFx(dt) {
   for (const q of S.particles) {
     q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt;
-    if (q.k === 'spark') { q.vx *= 1 - 5 * dt; q.vy *= 1 - 5 * dt; }
+    if (q.k === 'spark' || q.k === 'ring') { q.vx = (q.vx || 0) * (1 - 5 * dt); q.vy = (q.vy || 0) * (1 - 5 * dt); }
+    else if (q.k === 'wind') { /* gusts fly straight */ }
     else { q.vy += 380 * dt; q.vx *= 1 - 0.8 * dt; q.rot += q.vr * dt; }
   }
   S.particles = S.particles.filter((q) => q.life > 0);
+  for (const p of S.pops) p.t += dt;
+  S.pops = S.pops.filter((p) => p.t < p.life);
+  S.flash = Math.max(0, S.flash - dt * 1.6);
   if (S.banner) { S.banner.t += dt; if (S.banner.t > S.banner.dur) S.banner = null; }
   S.shake = Math.max(0, S.shake - 30 * dt);
 }
@@ -835,8 +937,34 @@ function drawFigure(x, y, team, a, alpha) {
   ctx.globalAlpha = 1;
   ctx.restore();
 }
+// swirling wind around a figure in whirlwind mode
+function drawTornado(x, y, team, k) {
+  const base = S.time * 20 + k;
+  ctx.save(); ctx.translate(x, y);
+  for (let i = 0; i < 3; i++) {
+    const r = 20 + i * 7, a = base * (1 + i * 0.2) + i * 2.1;
+    ctx.strokeStyle = i === 1 ? TEAM[team].shirt : '#ffffff';
+    ctx.globalAlpha = 0.75 - i * 0.18; ctx.lineWidth = 3.5 - i * 0.8; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(0, 0, r, a, a + 2.4); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, r, a + Math.PI, a + Math.PI + 1.6); ctx.stroke();
+  }
+  ctx.globalAlpha = 0.18; ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(0, 0, 18 + Math.sin(S.time * 30) * 3, 0, 7); ctx.fill();
+  ctx.restore(); ctx.globalAlpha = 1;
+}
 function drawBall(b) {
   const inNet = !!b.inGoal;
+  if (b.blast > 0 && b.trail && b.trail.length > 2) {
+    // comet tail of wind behind a launched ball
+    const col = TEAM[b.blastTeam].shirt;
+    for (let i = 0; i < b.trail.length; i += 2) {
+      const k = i / b.trail.length;
+      ctx.globalAlpha = k * 0.6 * Math.min(1, b.blast * 2);
+      ctx.fillStyle = i % 4 ? col : '#ffffff';
+      ctx.beginPath(); ctx.arc(b.trail[i], b.trail[i + 1], BALL_R * (0.3 + k * 0.9), 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
   ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(b.x + 4, b.y + 5, BALL_R, BALL_R * 0.8, 0, 0, 7); ctx.fill();
   ctx.save(); ctx.translate(b.x, b.y);
   const sc = inNet ? 0.9 : 1;
@@ -874,6 +1002,7 @@ function render() {
     const fast = Math.abs(r.w) > 9;
     for (let k = 0; k < r.n; k++) {
       const y = figY(r, k);
+      if (r.phase === 'whirl') drawTornado(r.x, y, r.team, k);
       if (fast) {   // motion blur while spinning, like the photo
         drawFigure(r.x, y, r.team, r.a - 0.5 * Math.sign(r.w), 0.25);
         drawFigure(r.x, y, r.team, r.a - 0.25 * Math.sign(r.w), 0.45);
@@ -884,11 +1013,31 @@ function render() {
   for (const q of S.particles) {
     ctx.globalAlpha = Math.min(1, q.life / q.max * 1.6);
     ctx.fillStyle = q.color;
+    if (q.k === 'ring') {
+      const a = q.life / q.max;
+      ctx.strokeStyle = q.color; ctx.lineWidth = 8 * a + 1;
+      ctx.beginPath(); ctx.arc(q.x, q.y, q.s + (1 - a) * q.grow, 0, 7); ctx.stroke();
+      continue;
+    }
+    if (q.k === 'wind') {
+      const sp = Math.hypot(q.vx, q.vy) || 1;
+      ctx.strokeStyle = q.color; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - (q.vx / sp) * 18, q.y - (q.vy / sp) * 18); ctx.stroke();
+      continue;
+    }
     if (q.k === 'conf') { ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.fillRect(-q.s / 2, -q.s, q.s, q.s * 2); ctx.restore(); }
     else ctx.fillRect(q.x - q.s / 2, q.y - q.s / 2, q.s, q.s);
   }
   ctx.globalAlpha = 1;
+  for (const p of S.pops) {
+    const k = p.t / p.life, sc = p.t < 0.15 ? 0.5 + (p.t / 0.15) * 0.8 : 1.3 - Math.min(0.3, p.t - 0.15);
+    ctx.save(); ctx.globalAlpha = k > 0.7 ? (1 - k) / 0.3 : 1;
+    ctx.translate(p.x, p.y - k * 40); ctx.scale(sc, sc);
+    drawText(p.text, 0, 0, 40, p.color, 9, '"ZCOOL KuaiLe", "Baloo 2", "PingFang SC", "Microsoft YaHei", sans-serif');
+    ctx.restore();
+  }
   ctx.restore();
+  if (S.flash > 0) { ctx.fillStyle = `rgba(255,250,230,${Math.min(0.5, S.flash)})`; ctx.fillRect(0, 0, W, H); }
   if (S.banner) {
     const bn = S.banner, inT = Math.min(1, bn.t / 0.3);
     const sc = 0.4 + 0.6 * (1 + 2.2 * Math.pow(inT - 1, 3) + 1.2 * Math.pow(inT - 1, 2));
@@ -902,13 +1051,14 @@ function render() {
 }
 
 // ---------- input ----------
-// 2 players: red W/S + D/Space, blue ↑/↓ + ←/Enter. 1 player (red vs computer): either set of keys drives red.
+// 2 players: red W/S + D/Space (left Shift = whirlwind), blue ↑/↓ + ← (Enter = whirlwind).
+// 1 player (red vs computer): either set of keys drives red.
 function keyMap(code) {
   const one = S && S.teams[BLUE].ai;
   const blue = one ? RED : BLUE;
   return {
-    KeyW: [RED, 'up'], KeyS: [RED, 'down'], KeyD: [RED, 'kick'], Space: [RED, 'kick'], KeyF: [RED, 'kick'],
-    ArrowUp: [blue, 'up'], ArrowDown: [blue, 'down'], ArrowLeft: [blue, 'kick'], Enter: [blue, 'kick'], NumpadEnter: [blue, 'kick'],
+    KeyW: [RED, 'up'], KeyS: [RED, 'down'], KeyD: [RED, 'kick'], Space: [RED, 'kick'], KeyF: [RED, 'kick'], ShiftLeft: [RED, 'whirl'],
+    ArrowUp: [blue, 'up'], ArrowDown: [blue, 'down'], ArrowLeft: [blue, 'kick'], Enter: [blue, 'whirl'], NumpadEnter: [blue, 'whirl'],
   }[code];
 }
 function inGame() { return S && !S.demo && !S.paused && !S.over && $('ovStart').hidden && $('ovOver').hidden; }
@@ -918,14 +1068,15 @@ window.addEventListener('keydown', (e) => {
   if (!m || !inGame()) return;
   e.preventDefault();
   const t = S.teams[m[0]];
-  if (m[1] === 'kick') { if (!e.repeat) t.kickTap = true; t.kickHeld = true; }
+  if (m[1] === 'whirl') { if (!e.repeat) startWhirl(t); }
+  else if (m[1] === 'kick') { if (!e.repeat) t.kickTap = true; t.kickHeld = true; }
   else t[m[1]] = true;
 });
 window.addEventListener('keyup', (e) => {
   const m = keyMap(e.code);
   if (!m || !S) return;
   const t = S.teams[m[0]];
-  if (m[1] === 'kick') t.kickHeld = false; else t[m[1]] = false;
+  if (m[1] === 'kick') t.kickHeld = false; else if (m[1] !== 'whirl') t[m[1]] = false;
 });
 function releaseAll() { if (S) S.teams.forEach((t) => { t.up = t.down = t.kickHeld = false; }); }
 window.addEventListener('blur', () => { releaseAll(); if (inGame()) togglePause(); });
@@ -980,14 +1131,25 @@ function updateHud() {
   $('scoreRed').textContent = S.teams[RED].score;
   $('scoreBlue').textContent = S.teams[BLUE].score;
 }
+const whirlCache = ['', ''];
+function updateWhirlHud() {
+  [['whirlRed', RED], ['whirlBlue', BLUE]].forEach(([id, t]) => {
+    const team = S.teams[t];
+    const txt = team.whirl > 0 ? '🌪️ 旋转中！' : team.whirlCool > 0 ? `🌪️ ${Math.ceil(team.whirlCool)}` : '🌪️ 就绪';
+    if (whirlCache[t] === txt) return;
+    whirlCache[t] = txt;
+    $(id).textContent = txt;
+    $(id).classList.toggle('ready', team.whirlCool <= 0 || team.whirl > 0);
+  });
+}
 function updateHint() {
   const one = settings.players === 1;
   $('nameBlue').textContent = one ? '电脑' : '蓝队';
   $('nameRed').textContent = one ? '我（红队）' : '红队';
   $('targetText').textContent = `先进 ${settings.target} 球获胜`;
   $('hint').innerHTML = one
-    ? '<kbd>W</kbd><kbd>S</kbd> 或 <kbd>↑</kbd><kbd>↓</kbd> 推拉杆子 · <kbd>D</kbd> / <kbd>空格</kbd> 踢球，按住一直转 · 手指上下拖、点一下踢球'
-    : '红队 <kbd>W</kbd><kbd>S</kbd> + <kbd>D</kbd> · 蓝队 <kbd>↑</kbd><kbd>↓</kbd> + <kbd>←</kbd> · 按住踢球键一直转 · 手机：左右半边各管一队';
+    ? '<kbd>W</kbd><kbd>S</kbd> 或 <kbd>↑</kbd><kbd>↓</kbd> 推拉杆子 · <kbd>D</kbd> / <kbd>空格</kbd> 踢球，按住一直转 · <kbd>回车</kbd> 🌪️ 旋风腿 · 手指上下拖、点一下踢球'
+    : '红队 <kbd>W</kbd><kbd>S</kbd> + <kbd>D</kbd>，<kbd>左 Shift</kbd> 🌪️ · 蓝队 <kbd>↑</kbd><kbd>↓</kbd> + <kbd>←</kbd>，<kbd>回车</kbd> 🌪️ · 按住踢球键一直转';
 }
 function startGame() {
   readSettings();
@@ -1012,7 +1174,7 @@ function showSummary() {
   const w = S.winner;
   $('overTitle').textContent = one ? (w === RED ? '你赢啦！🏆' : '电脑赢了，再来一局！') : `${TEAM[w].name}获胜！🏆`;
   $('finalRed').textContent = r; $('finalBlue').textContent = b;
-  $('overStats').textContent = `红队射门 ${S.teams[RED].shots} 次 · ${one ? '电脑' : '蓝队'}射门 ${S.teams[BLUE].shots} 次`;
+  $('overStats').textContent = `红队射门 ${S.teams[RED].shots} 次、旋风腿 ${S.teams[RED].whirls} 次 · ${one ? '电脑' : '蓝队'}射门 ${S.teams[BLUE].shots} 次、旋风腿 ${S.teams[BLUE].whirls} 次`;
   $('ovOver').hidden = false;
   $('btnAgain').focus();
 }
@@ -1040,7 +1202,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.033, (now - last) / 1000);
   last = now;
-  if (S && !S.paused) update(dt);
+  if (S && !S.paused) { update(dt); if (!S.demo) updateWhirlHud(); }
   render();
   requestAnimationFrame(frame);
 }
